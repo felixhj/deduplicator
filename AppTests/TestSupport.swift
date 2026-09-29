@@ -4,17 +4,31 @@ import Foundation
 import Testing
 @testable import Deduplicator
 
-/// A throwaway defaults domain, so tests never touch the app's real settings.
+/// Settings for one test, kept in memory, so tests never touch the app's real
+/// settings or leave preference files behind.
 final class TestDefaults {
-    let name = "DeduplicatorTests-\(UUID().uuidString)"
-    let defaults: UserDefaults
+    let defaults: UserDefaults = InMemoryDefaults()
+}
+
+/// User defaults that live only in memory. The typed getters, such as
+/// `data(forKey:)`, all read through `object(forKey:)`.
+final class InMemoryDefaults: UserDefaults, @unchecked Sendable {
+    private var values: [String: Any] = [:]
 
     init() {
-        defaults = UserDefaults(suiteName: name)!
+        super.init(suiteName: nil)!
     }
 
-    deinit {
-        defaults.removePersistentDomain(forName: name)
+    override func object(forKey defaultName: String) -> Any? {
+        values[defaultName]
+    }
+
+    override func set(_ value: Any?, forKey defaultName: String) {
+        values[defaultName] = value
+    }
+
+    override func removeObject(forKey defaultName: String) {
+        values[defaultName] = nil
     }
 }
 
