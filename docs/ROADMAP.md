@@ -7,9 +7,9 @@ checked on a Mac.
 | Phase | Deliverable | Verifiable on Linux? |
 |-------|-------------|----------------------|
 | 0 | Repo scaffolding, CLAUDE.md, spec, roadmap | ✅ done |
-| 1 | `DedupCore` foundations: `Track` model, text folding, the full set of toggleable normalisation rules (brackets, mix-class awareness, feat./collab artist splitting, "The", track-number prefixes, punctuation/diacritics), with tests | ✅ `swift test` |
-| 2 | `DedupCore` matching: similarity metrics (Jaro-Winkler, Levenshtein ratio, token-set ratio), per-field levels, duration/track#/album/format constraints, blocking, union-find with anchor check, confidence and reasons, presets, with tests and a 50k synthetic benchmark | ✅ |
-| 3 | `DedupCore` selection: auto-select keeper rules and a removal plan (Bin or mirrored-folder destinations), with tests | ✅ |
+| 1 | `DedupCore` foundations: `Track` model, text folding, the full set of toggleable normalisation rules (brackets, mix-class awareness, feat./collab artist splitting, "The", track-number prefixes, punctuation/diacritics), with tests | ✅ written, awaiting first compile |
+| 2 | `DedupCore` matching: similarity metrics (Jaro-Winkler, Levenshtein ratio, token-set ratio), per-field levels, duration/track#/album/format constraints, blocking, union-find with anchor check, confidence and reasons, presets, with tests and a 50k synthetic benchmark | ✅ written, awaiting first compile |
+| 3 | `DedupCore` selection: auto-select keeper rules and a removal plan (Bin or mirrored-folder destinations), with tests | ✅ written, awaiting first compile |
 | 4 | App shell: `project.yml` (XcodeGen), TagLib integration, concurrent folder scanner, decoded duration via AVFoundation, scan cache | ❌ Mac |
 | 5 | Results UI: flat banded table, collapsible groups, dynamic tag columns, diff highlighting, match settings panel | ❌ Mac |
 | 6 | Player: AVPlayer transport, A/B at the same position, waveform | ❌ Mac |

@@ -54,9 +54,17 @@ each field.
 
 ## Building
 
-_To be filled in when the first code lands._
+The matching engine (`DedupCore`) is a Swift package:
 
-## Project layout (planned)
+```sh
+swift build
+swift test
+```
+
+The macOS app target (`project.yml`, built with XcodeGen) arrives in
+phase 4. See `docs/ROADMAP.md`.
+
+## Project layout
 
 ```
 project.yml              XcodeGen spec for the macOS app
