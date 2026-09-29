@@ -10,7 +10,7 @@ checked on a Mac.
 | 1 | `DedupCore` foundations: `Track` model, text folding, the full set of toggleable normalisation rules (brackets, mix-class awareness, feat./collab artist splitting, "The", track-number prefixes, punctuation/diacritics), with tests | ✅ done, tests pass on macOS |
 | 2 | `DedupCore` matching: similarity metrics (Jaro-Winkler, Levenshtein ratio, token-set ratio), per-field levels, duration/track#/album/format constraints, blocking, union-find with anchor check, confidence and reasons, presets, with tests and a 50k synthetic benchmark | ✅ done, tests pass on macOS |
 | 3 | `DedupCore` selection: auto-select keeper rules and a removal plan (Bin or mirrored-folder destinations), with tests | ✅ done, tests pass on macOS |
-| 4 | App shell: `project.yml` (XcodeGen), TagLib integration, concurrent folder scanner, decoded duration via AVFoundation, scan cache | ❌ Mac |
+| 4 | App shell: `project.yml` (XcodeGen), TagLib integration, concurrent folder scanner, decoded duration via AVFoundation, scan cache | ✅ scanner and TagLib tested on macOS. ⚠️ The app shell compiles and links (`scripts/check-app.sh`) but hasn't been built in Xcode or run |
 | 5 | Results UI: flat banded table, collapsible groups, dynamic tag columns, diff highlighting, match settings panel | ❌ Mac |
 | 6 | Player: AVPlayer transport, A/B at the same position, waveform | ❌ Mac |
 | 7 | Removal: confirm sheet, Bin or mirrored move, JSON log, undo | ❌ Mac (the plan logic is tested in phase 3) |
@@ -19,9 +19,11 @@ checked on a Mac.
 
 ## Key technical choices
 
-- **TagLib** (C++) is used through a small Objective-C++ or C bridge in the app
-  target, vendored via SwiftPM. It reads every tag frame and handles FLAC,
-  AIFF and WAV reliably.
+- **TagLib** (C++, currently 2.3.2) is vendored as source in the `CTagLib`
+  package target and used through a small C interface, so Swift needs no C++
+  interop. It reads every tag and handles FLAC, AIFF and WAV reliably.
+- **Scanning** lives in the `DedupScanner` package target rather than the app
+  target, so it can be tested with `swift test` without Xcode.
 - **Duration** comes from `AVAudioFile` (frame length ÷ sample rate). This is
   the decoded length, not the tag.
 - **Blocking:** candidates are bucketed by the normalised artist (per primary

@@ -1,0 +1,48 @@
+# XcodeGen spec for the macOS app. Generate the project with `xcodegen`; the
+# generated Deduplicator.xcodeproj isn't committed.
+name: Deduplicator
+
+options:
+  bundleIdPrefix: io.github.felixhj
+  deploymentTarget:
+    macOS: "15.0"
+  createIntermediateGroups: true
+  developmentLanguage: en-GB
+
+packages:
+  # The Swift package in this folder: DedupCore, DedupScanner and TagLib.
+  Deduplicator:
+    path: .
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+
+targets:
+  Deduplicator:
+    type: application
+    platform: macOS
+    sources:
+      - path: App
+    dependencies:
+      - package: Deduplicator
+        product: DedupCore
+      - package: Deduplicator
+        product: DedupScanner
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.felixhj.Deduplicator
+        PRODUCT_NAME: Deduplicator
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Deduplicator
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.music
+        # For personal use: no App Sandbox, and signed to run locally without a team.
+        ENABLE_APP_SANDBOX: NO
+        ENABLE_HARDENED_RUNTIME: NO
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: "-"
+        DEVELOPMENT_TEAM: ""
+        ENABLE_USER_SCRIPT_SANDBOXING: YES
+        DEAD_CODE_STRIPPING: YES

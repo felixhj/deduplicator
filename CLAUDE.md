@@ -10,14 +10,14 @@ decoded duration and track number. It shows grouped matches, lets the user
 listen to and inspect every copy, then trashes the rejected files or moves them
 to a folder.
 
-**Continuing from the cloud session? Read `docs/HANDOFF.md` first.**
+**Picking up from an earlier session? Read `docs/HANDOFF.md` first.**
 
 The source of truth for requirements is `docs/SPEC.md`. Build order is in
 `docs/ROADMAP.md`. Update both when scope changes.
 
 ## Architecture
 
-The code is split into two layers. Keep this boundary strict.
+The code is split into three layers. Keep the boundaries strict.
 
 1. **`DedupCore`** is pure Swift with no AppKit, SwiftUI or AVFoundation. It
    holds:
@@ -27,13 +27,21 @@ The code is split into two layers. Keep this boundary strict.
    - similarity metrics (exact, token-based, Jaro-Winkler and Levenshtein
      ratios)
    - `MatchCriteria` and the grouping engine (blocking plus union-find)
-   - auto-select ("keeper") rules
+   - auto-select ("keeper") rules, and the removal plan and executor
 
    It must compile and pass its tests on Linux (`swift test`), so Claude can
    verify it in the cloud container, which has no Xcode.
-2. **`App/` (the macOS app, built from `project.yml` with XcodeGen)** holds the SwiftUI/AppKit UI, folder
-   scanning, tag reading and writing (TagLib bridge), audio duration measurement, the player and file
-   operations (trash or move). It depends on `DedupCore`.
+2. **`DedupScanner`** turns folders into `Track`s. It finds audio files, reads
+   tags and stream properties with TagLib, measures decoded duration with
+   `AVAudioFile`, and keeps the scan cache. TagLib is vendored as source in
+   **`CTagLib`**, a C++ target with a small C interface, so Swift needs no C++
+   interop (see `Sources/CTagLib/README.md`). Both are package targets, so they
+   build and test with `swift test` without Xcode. AVFoundation code sits
+   behind `#if canImport(AVFoundation)`, so the rest should also build on Linux.
+3. **`App/`** (the macOS app, built from `project.yml` with XcodeGen) holds the
+   SwiftUI/AppKit UI and the player, and ties the other two together. It
+   depends on the `DedupCore` and `DedupScanner` products. Tag writing
+   (phase 8) goes through `TagLibFile.write`.
 
 ## Conventions
 
@@ -57,15 +65,18 @@ The code is split into two layers. Keep this boundary strict.
 ```sh
 swift build                 # build everything the host platform supports
 scripts/test.sh             # run the package tests (wraps `swift test`, see below)
+scripts/check-app.sh        # compile and link the app sources without Xcode
 xcodegen && open Deduplicator.xcodeproj   # macOS app
 ```
 
 ## Environment notes for Claude
 
-- Cloud sessions run on Linux with no Xcode. You can only compile and test
-  `DedupCore` there, and only if a Swift toolchain is installed. Guard
-  macOS-only code with `#if canImport(AppKit)` or keep it in the app target, so
-  `swift build` still works on Linux.
+- Cloud sessions run on Linux with no Xcode. You can compile and test
+  `DedupCore` there, if a Swift toolchain is installed. `CTagLib` and
+  `DedupScanner` are meant to build there too (without AVFoundation, so no
+  durations), but that hasn't been tried yet. Guard macOS-only code with
+  `#if canImport(AppKit)` or `#if canImport(AVFoundation)`, or keep it in the
+  app target, so `swift build` still works on Linux.
 - Never claim UI or app code "works" without saying it was not compiled or run
   on macOS in the session.
 - On a Mac with only the Command Line Tools (no Xcode), plain `swift test`
@@ -74,3 +85,7 @@ xcodegen && open Deduplicator.xcodeproj   # macOS app
   plain `swift test`, so use it everywhere. Don't try to fix this in
   `Package.swift`: the generated test runner doesn't get the target's flags, so
   it builds but silently runs no tests.
+- Without Xcode there's no `xcodebuild`, so the app bundle can't be built.
+  `scripts/check-app.sh` still compiles and links the app's Swift sources
+  against the package as a bare executable. When that's the only check app code
+  had, say so.
