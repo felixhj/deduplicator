@@ -119,7 +119,7 @@ Read this, then `CLAUDE.md`, `docs/SPEC.md` and `docs/ROADMAP.md`. Branch:
   - TagLib, either via SwiftPM or vendored and built from source, reached
     through an Objective-C++ or C shim (read all properties and tags, plus
     write for phase 8)
-  - add `Deduplicator.xcodeproj/` stays gitignored
+  - `Deduplicator.xcodeproj/` stays gitignored
 - Scanner:
   - recursive enumeration of `AudioFormat.supportedExtensions`
   - a bounded `TaskGroup` that reads tags and audio properties (TagLib) and
