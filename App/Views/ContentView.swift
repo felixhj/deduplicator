@@ -40,6 +40,9 @@ struct ContentView: View {
         .sheet(isPresented: $results.isAutoSelecting) {
             AutoSelectSheet().environment(library)
         }
+        .sheet(item: $results.tagCopyRequest) { request in
+            CopyTagsSheet(request: request).environment(library)
+        }
     }
 
     @ViewBuilder private var detail: some View {

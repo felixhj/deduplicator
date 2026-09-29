@@ -67,7 +67,7 @@ final class RemovalModel {
         self.player = player
         self.logURL = logURL
         executor = RemovalExecutor(mover: mover)
-        (log, logProblem) = Self.loadLog(from: logURL)
+        (log, logProblem) = loadLog(from: logURL, empty: RemovalLog(), reading: RemovalLog.load(from:))
     }
 
     var isBusy: Bool { activity != .idle }
@@ -214,19 +214,6 @@ final class RemovalModel {
     }
 
     // MARK: - Log
-
-    /// An unreadable log is put aside, not written over, so no record is lost.
-    private static func loadLog(from url: URL?) -> (RemovalLog, String?) {
-        guard let url else { return (RemovalLog(), nil) }
-        do {
-            return (try RemovalLog.load(from: url), nil)
-        } catch {
-            let aside = url.deletingLastPathComponent()
-                .appending(path: "RemovalLog (unreadable \(Int(Date().timeIntervalSince1970))).json")
-            try? FileManager.default.moveItem(at: url, to: aside)
-            return (RemovalLog(), "The removal log couldn't be read, so it was put aside as “\(aside.lastPathComponent)”.")
-        }
-    }
 
     private func saveLog() {
         guard let logURL else { return }

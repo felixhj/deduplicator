@@ -379,11 +379,17 @@ final class ResultsTableController: NSObject {
         let menu = NSMenu()
         let mark = NSMenuItem(title: "Mark for Removal", action: #selector(markSelected), keyEquivalent: "d")
         let keep = NSMenuItem(title: "Keep", action: #selector(keepSelected), keyEquivalent: "k")
+        let copyTags = NSMenuItem(title: "Copy Tags from This Copy…", action: #selector(copyTagsFromSelected), keyEquivalent: "")
         let reveal = NSMenuItem(title: "Show in Finder", action: #selector(revealSelected), keyEquivalent: "")
         for item in [mark, keep] { item.keyEquivalentModifierMask = [] }
-        for item in [mark, keep, reveal] { item.target = self }
-        menu.items = [mark, keep, .separator(), reveal]
+        for item in [mark, keep, copyTags, reveal] { item.target = self }
+        menu.items = [mark, keep, .separator(), copyTags, reveal]
         return menu
+    }
+
+    @objc private func copyTagsFromSelected() {
+        guard let id = selectedTrackIDs.first, selectedTrackIDs.count == 1 else { return }
+        model.tagCopyRequest = TagCopyRequest(source: id)
     }
 
     @objc private func markSelected() { markSelection(true) }
@@ -442,6 +448,7 @@ extension ResultsTableController: NSMenuDelegate, NSMenuItemValidation {
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         switch menuItem.action {
         case #selector(markSelected), #selector(keepSelected), #selector(revealSelected): !selectedTrackIDs.isEmpty
+        case #selector(copyTagsFromSelected): selectedTrackIDs.count == 1
         default: true
         }
     }

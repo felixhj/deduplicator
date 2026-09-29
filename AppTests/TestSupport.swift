@@ -1,6 +1,7 @@
 import AppKit
 import AVFoundation
 import DedupCore
+import DedupScanner
 import Foundation
 import Testing
 @testable import Deduplicator
@@ -84,6 +85,28 @@ extension Fixtures {
             track.scanRoot = folder
             track.duration = seconds
             try FileManager.default.copyItem(at: original, to: track.url)
+            return track
+        }
+    }
+}
+
+extension Fixtures {
+    /// Two copies of a track, written with tags and read back the way a scan
+    /// reads them: a keeper (0) without a comment, BPM or date, and a copy
+    /// (1) that has them.
+    static func taggedPair(in folder: URL) throws -> [Track] {
+        let files: [(String, [String: [String]])] = [
+            ("keeper.wav", ["TITLE": ["Strings of Life"], "ARTIST": ["Derrick May"]]),
+            ("copy.wav", ["TITLE": ["Strings Of Life"], "ARTIST": ["Derrick May"], "COMMENT": ["Ripped from vinyl"], "BPM": ["123"], "DATE": ["1987"]]),
+        ]
+        return try files.enumerated().map { id, entry in
+            let url = folder.appending(path: entry.0)
+            try AudioFiles.write(to: url, seconds: 0.2)
+            try TagLibFile.write(entry.1, to: url)
+            let values = try url.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
+            let file = DiscoveredFile(url: url, root: folder, size: Int64(values.fileSize ?? 0), modified: values.contentModificationDate ?? Date())
+            var track = AudioFileReader().read(file).track
+            track.id = id
             return track
         }
     }

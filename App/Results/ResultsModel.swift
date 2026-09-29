@@ -68,6 +68,9 @@ final class ResultsModel {
     /// Set to show the auto-select sheet, for example from the Edit menu.
     var isAutoSelecting = false
 
+    /// Set to show the Copy Tags sheet, copying from the copy it names.
+    var tagCopyRequest: TagCopyRequest?
+
     @ObservationIgnored private var trackList: [Track] = []
     @ObservationIgnored private var searchIndex = SearchIndex()
     @ObservationIgnored private var matchTask: Task<Void, Never>?
@@ -218,6 +221,26 @@ final class ResultsModel {
         }
     }
 
+    /// Shows a copy's new values, as after its tags were written. The groups
+    /// stay as they are; matching uses the new values the next time it runs.
+    func update(_ track: Track) {
+        guard tracks[track.id] != nil else { return }
+        tracks[track.id] = track
+        if let index = trackList.firstIndex(where: { $0.id == track.id }) {
+            trackList[index] = track
+        }
+        searchIndex.remove([track.id])
+        searchIndex.add([track])
+        let newKeys = Set(track.tags.keys).subtracting(tagKeys)
+        if !newKeys.isEmpty { tagKeys = (tagKeys + newKeys).sorted() }
+        arrange()
+    }
+
+    /// The copies in the group holding `id`, in group order.
+    func copies(inGroupOf id: Track.ID) -> [Track] {
+        groups.first { $0.trackIDs.contains(id) }?.trackIDs.compactMap { tracks[$0] } ?? []
+    }
+
     /// Puts back copies whose removal was undone, then finds duplicates again.
     func restore(_ restored: [Track]) {
         guard !restored.isEmpty else { return }
@@ -246,6 +269,12 @@ final class ResultsModel {
         columns = TrackColumn.defaults
         columnWidths = [:]
     }
+}
+
+/// Which copy to copy tags from, for the Copy Tags sheet.
+struct TagCopyRequest: Identifiable, Equatable {
+    var source: Track.ID
+    var id: Track.ID { source }
 }
 
 /// Match settings and the column layout, kept in user defaults.

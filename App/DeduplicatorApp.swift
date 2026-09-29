@@ -34,6 +34,11 @@ struct DeduplicatorApp: App {
                     .disabled(!library.canAutoSelect)
                 Button("Unmark All") { library.results.unmarkAll() }
                     .disabled(library.results.marked.isEmpty || library.removal.isBusy)
+                Divider()
+                Button("Copy Tags…") {
+                    if let id = library.results.selection.first { library.results.tagCopyRequest = TagCopyRequest(source: id) }
+                }
+                .disabled(!library.canCopyTags)
             }
         }
 

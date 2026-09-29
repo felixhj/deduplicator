@@ -171,4 +171,26 @@ struct ResultsModelTests {
         model.load(Fixtures.library)
         #expect(model.generation == first + 1)
     }
+
+    @Test func updatingACopyShowsItsNewValues() async throws {
+        let model = try await loadedModel()
+        var track = try #require(model.tracks[1])
+        track.comment = "Ripped"
+        track.tags["MOOD"] = "Euphoric"
+        let revision = model.revision
+        model.update(track)
+        #expect(model.tracks[1]?.comment == "Ripped")
+        #expect(model.tagKeys.contains("MOOD"))
+        #expect(model.revision > revision)
+        model.filter.text = "euphoric"
+        #expect(model.shownGroups.isEmpty, "The filter doesn't search tags beyond the main fields")
+        model.filter.text = "strings"
+        #expect(model.shownGroups.count == 1)
+    }
+
+    @Test func copiesInAGroup() async throws {
+        let model = try await loadedModel()
+        #expect(model.copies(inGroupOf: 4).map(\.id) == [3, 4])
+        #expect(model.copies(inGroupOf: 5).isEmpty, "Not in any group")
+    }
 }

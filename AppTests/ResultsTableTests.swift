@@ -173,15 +173,20 @@ extension ResultsTableTests {
     @Test func rowMenuMarksKeepsAndNeedsASelection() async throws {
         let (model, table) = try await makeTable()
         let menu = try #require(table.tableView.menu)
-        #expect(menu.items.map(\.title) == ["Mark for Removal", "Keep", "", "Show in Finder"])
+        #expect(menu.items.map(\.title) == ["Mark for Removal", "Keep", "", "Copy Tags from This Copy…", "Show in Finder"])
         #expect(!table.validateMenuItem(menu.items[0]))
 
         table.tableView.selectRowIndexes([5, 6], byExtendingSelection: false)
         #expect(table.validateMenuItem(menu.items[0]))
+        #expect(!table.validateMenuItem(menu.items[3]), "Copying tags starts from one copy")
         menu.performActionForItem(at: 0)
         #expect(model.marked == [3, 4])
         menu.performActionForItem(at: 1)
         #expect(model.marked.isEmpty)
+
+        table.tableView.selectRowIndexes([6], byExtendingSelection: false)
+        menu.performActionForItem(at: 3)
+        #expect(model.tagCopyRequest == TagCopyRequest(source: 4))
     }
 
     @Test func headerMenuListsColumnsAndTags() async throws {

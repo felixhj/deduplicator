@@ -10,6 +10,9 @@ enum AppFolders {
     /// Every removal, and whether it was undone.
     static let removalLog = support.appending(path: "RemovalLog.json")
 
+    /// Every write of copied tags, with the values before and after.
+    static let tagEditLog = support.appending(path: "TagEditLog.json")
+
     /// ~/Library/Caches/Deduplicator/Waveforms. The system may empty it, which
     /// only means waveforms are drawn again.
     static let waveforms = URL.cachesDirectory.appending(path: "Deduplicator/Waveforms", directoryHint: .isDirectory)

@@ -93,6 +93,16 @@ struct SnapshotTests {
         try await snapshot(AutoSelectSheet().environment(library), as: "auto-select", appearance: .darkAqua)
     }
 
+    @Test(arguments: [("light", NSAppearance.Name.aqua), ("dark", NSAppearance.Name.darkAqua)])
+    func copyTagsSheet(name: String, appearance: NSAppearance.Name) async throws {
+        let tracks = try Fixtures.taggedPair(in: folder.url)
+        let library = LibraryModel(defaults: storage.defaults, cacheURL: nil, waveformFolder: nil, removalLog: nil, tagLog: nil)
+        library.results.load(tracks)
+        try await waitForMatching(library.results)
+        library.results.setMarked([1], true)
+        try await snapshot(CopyTagsSheet(request: TagCopyRequest(source: 1)).environment(library), as: "copy-tags-\(name)", appearance: appearance)
+    }
+
     @Test func removalReport() async throws {
         let failure = RemovalFailure(
             trackID: 1, source: URL(filePath: "/Music/House/Strings of Life.mp3"),
