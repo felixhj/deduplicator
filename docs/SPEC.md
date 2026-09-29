@@ -148,15 +148,19 @@ every member matches the group's anchor (configurable).
   group, with groups separated by a group header row and alternating band
   colours. Groups can be collapsed by clicking the header or its disclosure
   button; Option-click collapses or expands every group. The group header shows
-  the file count, the confidence and why the tracks matched, and warns when
-  every copy is marked for removal.
+  the file count, the confidence and why the tracks matched, and warns, right
+  after the title, when every copy is marked for removal. The status bar also
+  says when that's true of any group, with a link to the first.
 - Columns:
   - default columns: ✓ (remove), ▶, track #, title, artist, album artist,
     album, year, comment, duration, bitrate, format, size, path. More built-in
     columns: genre, disc, sample rate, bit depth, channels, modified, file name.
   - ✓ and ▶ always come first. ▶ shows a speaker on the copy in the player,
     and a play button on the row under the pointer.
-  - columns can be resized, reordered and hidden, and the layout persists
+  - columns can be resized, reordered and hidden, and the layout persists.
+    Double-clicking a heading's divider fits the column to its widest value
+    in the groups shown. Headings are left-aligned; numbers are right-aligned
+    in their cells.
   - **any tag** found in the scanned files can be added as a column. The column
     picker (right-click the column headings, or the Columns toolbar menu) lists
     every tag key seen.
@@ -243,9 +247,10 @@ every member matches the group's anchor (configurable).
 ## 8. Removal
 
 - **Remove** (the toolbar, or File > Remove Marked Files…, ⌘⌫) opens a confirm
-  sheet. It shows the file count and total size, warns when every copy in a
-  group is marked or when marked copies are in groups the filter hides, says
-  where the files go, and lists them.
+  sheet. It shows the file count and total size, warns when marked copies are
+  in groups the filter hides, says where the files go, and lists them. When
+  every copy of a track is marked, it names the track, and removing needs a
+  tick in "Remove every copy of this track".
 - The user chooses where removed files go in Settings, and can change it in
   the confirm sheet, which remembers the choice:
   1. **Move to Bin** (`FileManager.trashItem`, so the files can be restored from
@@ -279,8 +284,14 @@ every member matches the group's anchor (configurable).
 
 ## 9. Platform and non-functional
 
-- **macOS 15+**, for personal use: no App Sandbox and no App Store. The project
-  is generated with **XcodeGen** from `project.yml`.
+- **macOS 15+**: no App Sandbox and no App Store. Released on GitHub as a
+  universal app, signed to run locally but not notarised, under the MIT
+  licence. The project is generated with **XcodeGen** from `project.yml`.
+- At launch, the app asks GitHub for the latest release, and offers to open its
+  page when it's newer than the running version, unless that release was
+  skipped. Settings can switch this off, and the app menu has Check for
+  Updates…. There's no automatic updating.
+- Help > Deduplicator Help is a short guide to using the app.
 - Must stay responsive with **50k+ tracks**:
   - scanning is concurrent (a bounded task group), with progress and cancel
   - there is a persistent scan cache

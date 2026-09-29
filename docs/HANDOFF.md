@@ -1,31 +1,31 @@
 # Handoff
 
-Read this, then `CLAUDE.md`, `docs/SPEC.md` and `docs/ROADMAP.md`. Phases 8
-and 9 are on branch `claude/phases-8-9`, committed locally but not pushed
-(2026-09-29). Phases 0–7 are on `main`.
+Read this, then `CLAUDE.md`, `docs/SPEC.md` and `docs/ROADMAP.md`. Everything
+is on `main`, at version 1.0.0 (2026-09-29).
 
 ## Where we are
 
-- All nine phases are done: v1 is feature-complete. The app builds in Xcode 27
+- v1 is done and the user has tested it by hand. The app builds in Xcode 27
   (Swift 6.4) with no warnings, and every test passes: the package tests
   (`swift test` or `scripts/test.sh`) and the app tests in `AppTests/` (⌘U).
-- Phase 5 added the results screen, phase 6 the player, phase 7 removal, undo
-  and auto-select, phase 8 copying tags between copies, and phase 9 the
-  polish: the app icon, saved match presets, remembered order and confidence,
-  ⌘F, ⌥⌘I, ← and → in the table, a Keyboard Shortcuts window (⌘?), an About
-  box with the libraries' credits, and a guard against quitting while files
-  are being moved or written.
-- The user hasn't tested along the way: they'll test the finished app by hand
-  from `docs/TESTING.md`. Nothing has been checked against a real library
-  yet. The automated tests use generated files; the removal tests stand in
-  for the Bin with a folder of their own.
+- Phases 5–9 added the results screen, the player, removal with undo and
+  auto-select, copying tags between copies, and the polish (icon, saved
+  presets, shortcuts, About box, quit guard).
+- The user's testing led to the 1.0 round: dragging columns works again
+  (broken since phase 6), double-clicking a divider fits a column, headings
+  are all left-aligned, the every-copy-marked warnings are visible (header,
+  status bar, and a tick to confirm in the remove sheet), Help > Deduplicator
+  Help, an update check against GitHub releases, the MIT licence, and
+  `scripts/build-release.sh`.
+- The GitHub repository was still private at 1.0.0, so the update check can't
+  see its releases yet; it stays quiet at launch until it can.
 - Nothing has been built on Linux since TagLib was added.
 
 ## Do this first
 
-1. Help the user work through `docs/TESTING.md`, on a copy of their music,
-   and fix what it finds. Keep the checklist up to date with any change.
-2. Ask about the open questions below.
+1. If version 1.0.0 isn't published yet: see "Making a release" below.
+2. Ask about the open questions below, and work through anything the user
+   finds. Keep `docs/TESTING.md` up to date with every change.
 
 ## Open questions for the user
 
@@ -62,6 +62,10 @@ and 9 are on branch `claude/phases-8-9`, committed locally but not pushed
 - British English in the UI ("Bin", "normalise").
 - The user tests the finished app by hand, from `docs/TESTING.md`, rather
   than after each phase. Add to it whenever a feature is added or changes.
+- Open source under the MIT licence, released on GitHub as a zipped universal
+  app. It isn't notarised (there's no Developer ID), so the README explains
+  Open Anyway. Updates are only announced, from GitHub's latest release, not
+  installed.
 
 ## Engine map (`Sources/DedupCore`)
 
@@ -130,7 +134,8 @@ and 9 are on branch `claude/phases-8-9`, committed locally but not pushed
   window. File menu: Add Folder… (⌘O), Scan (⌘R), Stop Scan (⌘.), Remove
   Marked Files… (⌘⌫) and Undo Removal of N Files. Edit menu: Find… (⌘F),
   Auto-Select Keepers…, Unmark All and Copy Tags…. View menu: Show Match
-  Settings (⌥⌘I). Help menu: Keyboard Shortcuts (⌘?). The About box credits
+  Settings (⌥⌘I). Help menu: Deduplicator Help (⌘?) and Keyboard Shortcuts.
+  The app menu has Check for Updates…. The About box credits
   TagLib and utfcpp. `AppDelegate` holds quitting back while
   `LibraryModel.isChangingFiles`.
 - `Library/LibraryModel` (`@MainActor`, `@Observable`): the folders (kept in
@@ -176,9 +181,13 @@ and 9 are on branch `claude/phases-8-9`, committed locally but not pushed
   `KeeperRulesEditor`): presented by `ContentView`, so menu commands work
   whatever the window shows. `RemovalViews` holds their shared parts.
 - `Views/`: `ContentView` (split view, Scan button, folder picker, the
-  sheets), `FolderList` (add, remove, drop), `ScanViews` (before the first
-  scan, progress, and the scan report), `SettingsView` (removal and player
-  settings) and `ShortcutsView`.
+  sheets, the update alert), `FolderList` (add, remove, drop), `ScanViews`
+  (before the first scan, progress, and the scan report), `SettingsView`
+  (removal, update and player settings), `HelpView` and `ShortcutsView`.
+- `Updates/UpdateChecker`: reads `releases/latest` from GitHub's API, compares
+  its tag (`v1.2.3`) with `CFBundleShortVersionString`, and remembers a
+  skipped version. `UpdateAlert` shows what it found. The launch check
+  doesn't run inside tests.
 - `Results/MatchSettingsView` also saves and deletes the user's own presets
   (`SavedPreset`, kept in `UserDefaults` by `ResultsModel`).
 - `AppIcon.icon`: the app icon, an Icon Composer file of three SVG layers
@@ -230,6 +239,24 @@ and 9 are on branch `claude/phases-8-9`, committed locally but not pushed
   listed in the Keyboard Shortcuts window instead of the menus.
 - The removal and tag logs keep ISO 8601 dates, which drop fractions of a
   second, so compare logged dates in whole seconds.
+- `tableView(_:shouldReorderColumn:toColumn:)` is asked with -1 as a column
+  drag starts; refusing -1 stops every drag.
+- A view-based table only fits a column on a divider double-click if the
+  delegate answers `tableView(_:sizeToFitWidthOfColumn:)`. A label's intrinsic
+  width and its constraints use its alignment rect, which AppKit insets 2
+  points each side of its frame.
+- A group header row is as wide as every column together, about 1,600 points
+  by default, so anything at its far end is usually scrolled out of view.
+
+## Making a release
+
+1. Set `MARKETING_VERSION` in `project.yml` (and bump
+   `CURRENT_PROJECT_VERSION`), and commit.
+2. Run `scripts/build-release.sh`. It builds for Apple silicon and Intel, checks
+   the signature, and writes `build/release/Deduplicator-<version>.zip`.
+3. On GitHub: Releases > Draft a new release, create the tag `v<version>` on
+   `main`, attach the zip, and publish. The update check compares that tag with
+   the app's version, so they must match.
 
 ## After v1
 

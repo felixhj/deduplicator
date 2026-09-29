@@ -51,7 +51,8 @@ The code is split into three layers. Keep the boundaries strict.
    auto-select; every file it moves goes through `RemovalExecutor`.
    `App/Tags/` copies tags between copies; every tag it writes goes through
    `TagLibFile.write`, and is logged. `App/AppIcon.icon` is the app icon, an
-   Icon Composer file. `AppTests/` holds tests hosted in the
+   Icon Composer file. `App/Updates/` asks GitHub for the latest release at
+   launch. `AppTests/` holds tests hosted in the
    app, for the models, the table, the player, removal and tag copying. The
    player tests play silent files, and the removal and tag tests change real
    files within their own temporary folder, which also stands in for the Bin.
@@ -83,6 +84,7 @@ scripts/test.sh             # run the package tests (wraps `swift test`, see bel
 scripts/check-app.sh        # compile and link the app sources without Xcode
 xcodegen && open Deduplicator.xcodeproj   # macOS app
 xcodebuild -project Deduplicator.xcodeproj -scheme Deduplicator test   # every test (⌘U in Xcode)
+scripts/build-release.sh    # universal release build, zipped in build/release/ for GitHub
 ```
 
 To look at the results screen without clicking through the app, render it to

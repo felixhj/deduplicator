@@ -1,11 +1,8 @@
 # Deduplicator
 
-A native macOS app for finding and removing duplicate music files, by comparing
-tags intelligently instead of by file hash.
-
-> **Status:** v1 is built and being tested by hand, using the checklist in
-> [`docs/TESTING.md`](docs/TESTING.md). See [`docs/SPEC.md`](docs/SPEC.md) for
-> what it does and [`docs/ROADMAP.md`](docs/ROADMAP.md) for how it was built.
+A Mac app that finds duplicate music files by comparing their tags, not their
+bytes, so it catches the copies that hash and file name checks miss. Listen to
+the copies side by side, keep the best one, and move the rest to the Bin.
 
 ## Why
 
@@ -27,63 +24,80 @@ each field.
 ## Features
 
 - **Tag-aware matching** on title and artist. Each field can require an
-  identical, similar or fuzzy match, with an adjustable threshold.
-- **Smart normalisation rules** that you can switch on or off one at a time:
+  identical, similar or fuzzy match, with an adjustable threshold. Start from a
+  preset, and save your own.
+- **Normalisation rules** that you can switch on or off one at a time:
   bracketed or suffix mix names, `feat.`/`ft.`/`featuring`/`vs.`/`&`/`x`
   artist credits, case, accents, punctuation, "The" prefixes, whitespace,
   track-number prefixes left in titles, and more.
 - **Extra constraints:** duration tolerance in ±seconds, taken from the decoded
   audio rather than the length tag; same or different track number; and more.
-- **Grouped results view** that shows each duplicate group with configurable,
-  resizable and reorderable columns. Any tag in the file can be a column.
-- **Built-in player** for A/B listening within a group: switching copies
-  carries on from the same point, and a waveform shows where you are.
-- **Choosing the copy to keep:** pick by hand or with auto-select rules, such
-  as highest bitrate, lossless over lossy, or longest, with a preview.
-- **Basic tag copying:** take tag values from one copy and write them to the
-  keeper, after reviewing every change.
-- **Safe removal:** send the selected files to the Bin, or move them to a folder
-  you choose, with the folder structure mirrored. Every removal is logged and
-  can be undone.
-- Built for libraries of **50k+ tracks**.
+- **A grouped results table** with columns you can resize, reorder and hide.
+  Any tag in your files can be a column, and values that differ between copies
+  are highlighted.
+- **A built-in player** for A/B listening: switching to another copy of the
+  same track carries on from the same point, and a waveform shows where you are.
+- **Choosing the copy to keep:** by hand, or with auto-select rules such as
+  lossless first, then the highest bitrate, with a preview before anything is
+  marked.
+- **Tag copying:** take tag values from one copy and write them to the one you
+  keep, after reviewing every change.
+- **Safe removal:** marked files go to the Bin, or to a folder you choose with
+  their folders mirrored. Nothing is deleted, every removal is logged, and the
+  last one can be undone, even after quitting.
+- Built for libraries of **50,000+ tracks**, in MP3, AAC, ALAC, FLAC, AIFF and
+  WAV.
 
-## Requirements
+## Install
 
-- macOS 15 (Sequoia) or later
-- Xcode 16+ and Swift 6 to build the app. The Swift package builds and tests
-  with just the Command Line Tools.
-- [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`)
+1. Download `Deduplicator-<version>.zip` from the
+   [latest release](https://github.com/felixhj/deduplicator/releases/latest),
+   and unzip it.
+2. Move Deduplicator into your Applications folder.
+3. Open it. The app isn't notarised by Apple, so the first time, macOS says it
+   can't check it and won't open it. Open System Settings > Privacy & Security,
+   and under Security click **Open Anyway**. You only do this once.
 
-## Building
+Deduplicator needs macOS 15 (Sequoia) or later, on an Apple silicon or Intel
+Mac. When a new version is out, the app says so as it opens. Help >
+Deduplicator Help explains how to use it.
+
+## Building from source
+
+You need Xcode 26 or later and [XcodeGen](https://github.com/yonaskolb/XcodeGen)
+(`brew install xcodegen`).
 
 ```sh
-swift build
-scripts/test.sh    # runs `swift test`; also works with only the Command Line Tools
-xcodegen           # generates Deduplicator.xcodeproj, which isn't committed
-open Deduplicator.xcodeproj
+xcodegen && open Deduplicator.xcodeproj   # then ⌘R to run, and ⌘U to run every test
+scripts/test.sh                           # the package's tests, even with only the Command Line Tools
+scripts/build-release.sh                  # a release build for Apple silicon and Intel, zipped for GitHub
 ```
 
-In Xcode, ⌘U runs every test: the app's own and the package's.
+`xcodegen` makes `Deduplicator.xcodeproj` from `project.yml`; the project file
+isn't committed. [`CLAUDE.md`](CLAUDE.md) describes the architecture, and
+[`docs/`](docs) holds the spec, the build history, and a checklist for testing
+by hand.
 
 ## Project layout
 
 ```
 project.yml              XcodeGen spec for the macOS app
 Package.swift            SwiftPM manifest: DedupCore, DedupScanner and CTagLib
-Sources/DedupCore/       Platform-independent matching engine (normalisation,
-                         similarity, grouping, removal plans). Builds on Linux too.
+Sources/DedupCore/       Platform-independent logic: normalisation, similarity,
+                         grouping, keeper rules and removal plans.
 Sources/DedupScanner/    Folder scanning: finds audio files, reads tags with
-                         TagLib, measures decoded duration, keeps the scan cache.
-                         Also draws the player's waveforms.
+                         TagLib, measures decoded duration, keeps the scan cache,
+                         and draws the player's waveforms.
 Sources/CTagLib/         TagLib, vendored as source, with a small C interface.
-App/                     macOS SwiftUI app: UI, player and file operations.
-AppTests/                Tests hosted in the app, for its models, table and player.
+App/                     The macOS app: interface, player, removal and tag copying.
+AppTests/                Tests hosted in the app.
 Tests/                   Tests for DedupCore and DedupScanner.
-scripts/                 Test and build helpers.
-docs/                    Spec, roadmap and design notes.
+scripts/                 Test, check and release scripts.
+docs/                    Spec, roadmap, testing checklist and handoff notes.
 ```
 
 ## Licence
 
-TBD. The vendored TagLib is available under the LGPL 2.1 or the MPL 1.1, and
-utfcpp under the Boost Software License. See `Sources/CTagLib/licenses/`.
+MIT: see [`LICENSE`](LICENSE). The app includes TagLib, available under the LGPL
+2.1 or the MPL 1.1, and utfcpp, under the Boost Software License. Their licences
+are in [`Sources/CTagLib/licenses/`](Sources/CTagLib/licenses).

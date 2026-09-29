@@ -16,6 +16,7 @@ checked on a Mac.
 | 7 | Removal: confirm sheet, Bin or mirrored move, JSON log, undo; auto-select keepers with editable rules and a preview (SPEC §6) | ✅ done. The plan, keeper, executor and log logic is tested anywhere; removal, undo and auto-select by app tests in Xcode, with real files |
 | 8 | Basic tag editing: copy tags to the keeper via TagLib | ✅ done. The comparison logic is tested anywhere, re-reading a file with `swift test` on a Mac, and writing real files by app tests in Xcode |
 | 9 | Polish: settings persistence, presets UI, keyboard shortcuts, app icon | ✅ done. Saved presets and remembered settings are tested by app tests in Xcode; the icon, menus and windows by looking |
+| 1.0 | Fixes from testing by hand (dragging and fitting columns, visible every-copy warnings, left-aligned headings), a help window, an update check, the MIT licence and a release script | ✅ done |
 
 ## Key technical choices
 

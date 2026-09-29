@@ -73,6 +73,12 @@ Where the app keeps its data, to inspect it or start again:
 - [ ] Add, move, resize and hide columns, from the header's right-click menu
       and the Columns toolbar menu. Any tag can be added. The layout is kept
       after quitting and reopening.
+- [ ] Double-click the divider to the right of a column heading: the column
+      fits its widest value, or its heading if that's wider.
+- [ ] Drag a column heading to move the column. Every column moves except ✓
+      and ▶, and the order is kept after quitting and reopening.
+- [ ] Number columns keep their values right-aligned, but their headings are
+      left-aligned like the others.
 - [ ] Cells that differ within a group are highlighted; path and file name
       never are.
 - [ ] Clicking a column heading sorts groups and the copies within them;
@@ -81,7 +87,9 @@ Where the app keeps its data, to inspect it or start again:
       ignoring case and accents. The confidence menu hides weaker groups.
 - [ ] Keys: ↑/↓ move, `d` marks, `k` keeps, ⌘↓ and ⌘↑ jump between groups.
 - [ ] Right-click a copy: Mark for Removal, Keep and Show in Finder work.
-- [ ] Marking every copy in a group shows the orange warning in its header.
+- [ ] Marking every copy in a group shows the orange warning in its header,
+      right after the title, even with the table scrolled or narrow. The
+      status bar says so too, and its Show link selects that group.
 - [ ] Light and dark mode both look right.
 
 ## Player
@@ -122,8 +130,10 @@ Where the app keeps its data, to inspect it or start again:
 
 Use the test copy of your music for all of these.
 
-- [ ] Remove (toolbar, or ⌘⌫) shows the file count, size, and warnings when
-      every copy in a group is marked or marks are hidden by the filter.
+- [ ] Remove (toolbar, or ⌘⌫) shows the file count, size, and a warning when
+      marks are hidden by the filter.
+- [ ] With every copy of a track marked, Remove names the track in an orange
+      box, and the Move button stays off until you tick "Remove every copy".
 - [ ] Move to Bin: the files are in the Bin, and the Finder's Put Back works
       on them too.
 - [ ] Move to a folder: the files are there, inside a folder named after the
@@ -177,7 +187,7 @@ Use the test copy of your music for these too.
       icons (System Settings > Appearance).
 - [ ] Deduplicator > About Deduplicator shows the version and credits TagLib
       and utfcpp.
-- [ ] Help > Keyboard Shortcuts (⌘?) lists the shortcuts, and each one works.
+- [ ] Help > Keyboard Shortcuts lists the shortcuts, and each one works.
 - [ ] ⌘F puts the cursor in the filter.
 - [ ] View > Show Match Settings (⌥⌘I) shows and hides the match settings,
       and the menu item's name follows.
@@ -196,6 +206,22 @@ Use the test copy of your music for these too.
 - [ ] Settings (⌘,) holds the removal and player settings, and both are kept.
 - [ ] Every sheet can be cancelled with Escape, and its main button pressed
       with Return.
+
+## Help, updates and the release
+
+- [ ] Help > Deduplicator Help (⌘?) opens the guide, and Help > Keyboard
+      Shortcuts the list of shortcuts.
+- [ ] Deduplicator > About Deduplicator shows version 1.0.0 and the MIT
+      Licence.
+- [ ] Deduplicator > Check for Updates… says it couldn't check while the
+      repository is private or has no release, and that you're up to date once
+      version 1.0.0 is published.
+- [ ] Once a later release exists, opening this version offers to download it,
+      and Skip This Version stops it asking about that release. The switch in
+      Settings > Updates stops the check at launch.
+- [ ] The release zip: unzip it, move the app to Applications and open it.
+      macOS asks once; System Settings > Privacy & Security > Open Anyway
+      opens it. Try it on an Intel Mac too if you have one.
 
 ## A big library
 
