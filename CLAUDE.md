@@ -56,7 +56,7 @@ The code is split into two layers. Keep this boundary strict.
 
 ```sh
 swift build                 # build everything the host platform supports
-swift test                  # run DedupCore tests (works on Linux and macOS)
+scripts/test.sh             # run the package tests (wraps `swift test`, see below)
 xcodegen && open Deduplicator.xcodeproj   # macOS app
 ```
 
@@ -68,3 +68,9 @@ xcodegen && open Deduplicator.xcodeproj   # macOS app
   `swift build` still works on Linux.
 - Never claim UI or app code "works" without saying it was not compiled or run
   on macOS in the session.
+- On a Mac with only the Command Line Tools (no Xcode), plain `swift test`
+  fails with `no such module 'Testing'`: SwiftPM doesn't pass Swift Testing's
+  framework path. `scripts/test.sh` adds the missing paths and otherwise runs
+  plain `swift test`, so use it everywhere. Don't try to fix this in
+  `Package.swift`: the generated test runner doesn't get the target's flags, so
+  it builds but silently runs no tests.

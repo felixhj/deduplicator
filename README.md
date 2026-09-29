@@ -58,7 +58,7 @@ The matching engine (`DedupCore`) is a Swift package:
 
 ```sh
 swift build
-swift test
+scripts/test.sh    # runs `swift test`; also works with only the Command Line Tools
 ```
 
 The macOS app target (`project.yml`, built with XcodeGen) arrives in
