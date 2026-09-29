@@ -1,0 +1,17 @@
+# macOS
+.DS_Store
+
+# Swift / Xcode
+.build/
+.swiftpm/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
+Packages/
+Package.resolved.bak
+
+# Build products
+build/
+*.app
+*.dmg
