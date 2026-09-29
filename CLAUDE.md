@@ -10,6 +10,8 @@ decoded duration and track number. It shows grouped matches, lets the user
 listen to and inspect every copy, then trashes the rejected files or moves them
 to a folder.
 
+**Continuing from the cloud session? Read `docs/HANDOFF.md` first.**
+
 The source of truth for requirements is `docs/SPEC.md`. Build order is in
 `docs/ROADMAP.md`. Update both when scope changes.
 
@@ -21,7 +23,7 @@ The code is split into two layers. Keep this boundary strict.
    holds:
    - `Track`, a plain value type with the tags already read, the duration and
      file info
-   - the normalisation pipeline, made of small composable `NormalisationRule`s
+   - the normalisation pipeline (`NormalisationOptions` toggles applied by `Normaliser`)
    - similarity metrics (exact, token-based, Jaro-Winkler and Levenshtein
      ratios)
    - `MatchCriteria` and the grouping engine (blocking plus union-find)
