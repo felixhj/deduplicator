@@ -4,21 +4,60 @@ import SwiftUI
 /// Every setting that decides what counts as a duplicate. Changes apply as you make them.
 struct MatchSettingsView: View {
     @Binding var criteria: MatchCriteria
+    /// Presets the user has saved.
+    @Binding var presets: [SavedPreset]
+    @State private var isNaming = false
+    @State private var newName = ""
 
     var body: some View {
         Form {
             Section {
-                Picker("Preset", selection: presetBinding) {
-                    ForEach(MatchPreset.allCases) { preset in
-                        Text(preset.title).tag(Optional(preset))
-                    }
-                    if MatchPreset(matching: criteria) == nil {
-                        Text("Custom").tag(MatchPreset?.none)
+                LabeledContent("Preset") {
+                    HStack(spacing: 6) {
+                        Picker("Preset", selection: presetBinding) {
+                            ForEach(MatchPreset.allCases) { preset in
+                                Text(preset.title).tag(PresetChoice.builtIn(preset))
+                            }
+                            if !presets.isEmpty {
+                                Divider()
+                                ForEach(presets, id: \.name) { preset in
+                                    Text(preset.name).tag(PresetChoice.saved(preset.name))
+                                }
+                            }
+                            if choice == .custom {
+                                Text("Custom").tag(PresetChoice.custom)
+                            }
+                        }
+                        .labelsHidden()
+                        Menu {
+                            Button("Save as Preset…") {
+                                newName = ""
+                                isNaming = true
+                            }
+                            if case .saved(let name) = choice {
+                                Button("Delete “\(name)”") { presets.removeAll { $0.name == name } }
+                            }
+                        } label: {
+                            Label("Presets", systemImage: "ellipsis.circle")
+                        }
+                        .menuStyle(.borderlessButton)
+                        .menuIndicator(.hidden)
+                        .labelStyle(.iconOnly)
+                        .fixedSize()
+                        .help("Save these settings as a preset, or delete one")
                     }
                 }
             } footer: {
-                Text(MatchPreset(matching: criteria)?.summary ?? "Your own settings.")
+                Text(summary)
                     .foregroundStyle(.secondary)
+            }
+            .alert("Save Preset", isPresented: $isNaming) {
+                TextField("Name", text: $newName)
+                Button("Save") { save(named: newName) }
+                    .disabled(newName.trimmingCharacters(in: .whitespaces).isEmpty)
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Saves the match settings as they are now. Saving under a name that's taken replaces that preset.")
             }
 
             Section("Title") {
@@ -96,11 +135,33 @@ struct MatchSettingsView: View {
         .formStyle(.grouped)
     }
 
-    private var presetBinding: Binding<MatchPreset?> {
+    private var choice: PresetChoice {
+        PresetChoice(matching: criteria, saved: presets)
+    }
+
+    private var presetBinding: Binding<PresetChoice> {
         Binding(
-            get: { MatchPreset(matching: criteria) },
-            set: { preset in if let preset { criteria = preset.criteria } }
+            get: { choice },
+            set: { choice in
+                switch choice {
+                case .builtIn(let preset): criteria = preset.criteria
+                case .saved(let name): if let saved = presets.first(where: { $0.name == name }) { criteria = saved.criteria }
+                case .custom: break
+                }
+            }
         )
+    }
+
+    private var summary: String {
+        switch choice {
+        case .builtIn(let preset): preset.summary
+        case .saved(let name): "Your preset “\(name)”."
+        case .custom: "Your own settings. Save them as a preset to come back to them."
+        }
+    }
+
+    private func save(named name: String) {
+        presets = SavedPreset.list(presets, saving: criteria, as: name)
     }
 
     private var durationEnabled: Binding<Bool> {
@@ -164,6 +225,40 @@ private struct ComparisonPicker: View {
             Text("Any").tag(Comparison.any)
             Text("Must be the same").tag(Comparison.same)
             Text(differentTitle).tag(Comparison.different)
+        }
+    }
+}
+
+/// Match settings the user saved under a name.
+struct SavedPreset: Codable, Hashable {
+    var name: String
+    var criteria: MatchCriteria
+
+    /// `presets` with `criteria` saved as `name`, replacing a preset of that
+    /// name, in name order. A blank name changes nothing.
+    static func list(_ presets: [SavedPreset], saving criteria: MatchCriteria, as name: String) -> [SavedPreset] {
+        let name = name.trimmingCharacters(in: .whitespaces)
+        guard !name.isEmpty else { return presets }
+        return (presets.filter { $0.name != name } + [SavedPreset(name: name, criteria: criteria)])
+            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
+}
+
+/// A choice in the preset picker.
+enum PresetChoice: Hashable {
+    case builtIn(MatchPreset)
+    case saved(String)
+    /// Settings that match no preset.
+    case custom
+
+    /// The preset the settings match, built-in ones first.
+    init(matching criteria: MatchCriteria, saved presets: [SavedPreset]) {
+        if let preset = MatchPreset(matching: criteria) {
+            self = .builtIn(preset)
+        } else if let saved = presets.first(where: { $0.criteria == criteria }) {
+            self = .saved(saved.name)
+        } else {
+            self = .custom
         }
     }
 }

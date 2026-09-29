@@ -53,6 +53,16 @@ struct PlayerModelTests {
         #expect(player.position == 2, "Seeking stops at the end")
     }
 
+    @Test func skippingMovesFromWhereTheCopyIs() throws {
+        let (player, tracks) = try makePlayer()
+        player.select(tracks[0], copies: copies(tracks, of: 0))
+        player.seek(to: 0.5)
+        player.skip(by: 1)
+        #expect(player.position == 1.5)
+        player.skip(by: -10)
+        #expect(player.position == 0)
+    }
+
     @Test func anotherCopyOfTheSameTrackCarriesOnFromTheSamePoint() async throws {
         let (player, tracks) = try makePlayer()
         let group = copies(tracks, of: 0)

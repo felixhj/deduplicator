@@ -27,26 +27,10 @@ public struct RemovalLog: Sendable, Hashable, Codable {
     }
 
     public static func load(from url: URL) throws -> RemovalLog {
-        guard FileManager.default.fileExists(atPath: url.path) else { return RemovalLog() }
-        let data = try Data(contentsOf: url)
-        return try decoder.decode(RemovalLog.self, from: data)
+        try LogFile.load(RemovalLog.self, from: url) ?? RemovalLog()
     }
 
     public func save(to url: URL) throws {
-        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try Self.encoder.encode(self).write(to: url, options: .atomic)
-    }
-
-    static var encoder: JSONEncoder {
-        let e = JSONEncoder()
-        e.outputFormatting = [.prettyPrinted, .sortedKeys]
-        e.dateEncodingStrategy = .iso8601
-        return e
-    }
-
-    static var decoder: JSONDecoder {
-        let d = JSONDecoder()
-        d.dateDecodingStrategy = .iso8601
-        return d
+        try LogFile.save(self, to: url)
     }
 }

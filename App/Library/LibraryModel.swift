@@ -23,6 +23,8 @@ final class LibraryModel {
     let player: PlayerModel
     /// Removes marked copies and undoes removals.
     let removal: RemovalModel
+    /// Writes tags copied between copies.
+    let tagWriter: TagWriter
     /// Set to show the folder picker, for example from the Add Folder command.
     var isChoosingFolders = false
 
@@ -33,13 +35,15 @@ final class LibraryModel {
     private static let foldersKey = "scanFolders"
 
     /// `cacheURL` is where scans keep their cache, `waveformFolder` where the
-    /// player keeps waveforms and `removalLog` where removals are logged; nil
-    /// turns any of them off. `fileMover` moves removed files.
+    /// player keeps waveforms, and `removalLog` and `tagLog` where removals
+    /// and tag writes are logged; nil turns any of them off. `fileMover`
+    /// moves removed files.
     init(
         defaults: UserDefaults = .standard,
         cacheURL: URL? = AppFolders.scanCache,
         waveformFolder: URL? = AppFolders.waveforms,
         removalLog: URL? = AppFolders.removalLog,
+        tagLog: URL? = AppFolders.tagEditLog,
         fileMover: any FileMover = LocalFileMover()
     ) {
         self.defaults = defaults
@@ -47,6 +51,7 @@ final class LibraryModel {
         results = ResultsModel(defaults: defaults)
         player = PlayerModel(defaults: defaults, waveforms: waveformFolder.map { WaveformCache(folder: $0) })
         removal = RemovalModel(results: results, player: player, logURL: removalLog, mover: fileMover)
+        tagWriter = TagWriter(results: results, player: player, logURL: tagLog)
         folders = (defaults.stringArray(forKey: Self.foldersKey) ?? [])
             .map { URL(filePath: $0, directoryHint: .isDirectory) }
     }
@@ -68,10 +73,23 @@ final class LibraryModel {
 
     var canUndoRemoval: Bool { removal.canUndo && !isScanning && !isShowingSheet }
 
+    /// Copying tags starts from one selected copy.
+    var canCopyTags: Bool {
+        !isScanning && !removal.isBusy && !isShowingSheet && results.selection.count == 1
+    }
+
+    /// A scan has finished, so the results are showing.
+    var hasResults: Bool {
+        if case .finished = state { true } else { false }
+    }
+
+    /// Files are being moved or written, which quitting mustn't interrupt.
+    var isChangingFiles: Bool { removal.isBusy || tagWriter.isWriting }
+
     /// Menu commands still work while a sheet is up, and a window shows one
     /// sheet at a time, so commands that open one, or change what one shows, wait.
     var isShowingSheet: Bool {
-        removal.isConfirmingRemoval || removal.isUndoing || results.isAutoSelecting
+        removal.isConfirmingRemoval || removal.isUndoing || results.isAutoSelecting || results.tagCopyRequest != nil
     }
 
     /// Adds folders that aren't in the list yet, including repeats within `urls`.

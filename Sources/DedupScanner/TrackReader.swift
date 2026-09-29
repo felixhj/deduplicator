@@ -40,3 +40,24 @@ public struct AudioFileReader: TrackReader {
         return TrackReadResult(track: track, problems: problems)
     }
 }
+
+extension AudioFileReader {
+    /// Reads a track's file again, as after its tags are written. The track
+    /// keeps its ID and scan root; everything else, size and date included,
+    /// comes from the file as it is now.
+    public func reread(_ track: Track) -> TrackReadResult {
+        var url = track.url
+        url.removeAllCachedResourceValues()
+        let values = try? url.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
+        let file = DiscoveredFile(
+            url: track.url,
+            root: track.scanRoot ?? track.url.deletingLastPathComponent(),
+            size: Int64(values?.fileSize ?? 0),
+            modified: values?.contentModificationDate ?? Date(timeIntervalSince1970: 0)
+        )
+        var result = read(file)
+        result.track.id = track.id
+        result.track.scanRoot = track.scanRoot
+        return result
+    }
+}

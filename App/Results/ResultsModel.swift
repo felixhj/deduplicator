@@ -36,12 +36,21 @@ final class ResultsModel {
         }
     }
 
+    /// The text isn't kept between launches; the minimum confidence is.
     var filter = ResultFilter() {
-        didSet { if filter != oldValue { arrange() } }
+        didSet {
+            guard filter != oldValue else { return }
+            if filter.minimumConfidence != oldValue.minimumConfidence { settings.minimumConfidence = filter.minimumConfidence }
+            arrange()
+        }
     }
 
     var order: GroupOrder = .confidence {
-        didSet { if order != oldValue { arrange() } }
+        didSet {
+            guard order != oldValue else { return }
+            settings.order = order
+            arrange()
+        }
     }
 
     /// Visible columns, in order.
@@ -65,8 +74,19 @@ final class ResultsModel {
         didSet { if keeperRules != oldValue { settings.keeperRules = keeperRules } }
     }
 
+    /// Match settings the user saved as presets.
+    var savedPresets: [SavedPreset] {
+        didSet { if savedPresets != oldValue { settings.savedPresets = savedPresets } }
+    }
+
     /// Set to show the auto-select sheet, for example from the Edit menu.
     var isAutoSelecting = false
+
+    /// Set to show the Copy Tags sheet, copying from the copy it names.
+    var tagCopyRequest: TagCopyRequest?
+
+    /// Goes up to move the keyboard focus to the filter, as Find does.
+    var filterFocusRequests = 0
 
     @ObservationIgnored private var trackList: [Track] = []
     @ObservationIgnored private var searchIndex = SearchIndex()
@@ -80,6 +100,9 @@ final class ResultsModel {
         columns = settings.columns
         columnWidths = settings.columnWidths
         keeperRules = settings.keeperRules
+        savedPresets = settings.savedPresets
+        order = settings.order
+        filter.minimumConfidence = settings.minimumConfidence
     }
 
     /// Takes the tracks from a new scan. Marks are cleared, because track IDs
@@ -218,6 +241,26 @@ final class ResultsModel {
         }
     }
 
+    /// Shows a copy's new values, as after its tags were written. The groups
+    /// stay as they are; matching uses the new values the next time it runs.
+    func update(_ track: Track) {
+        guard tracks[track.id] != nil else { return }
+        tracks[track.id] = track
+        if let index = trackList.firstIndex(where: { $0.id == track.id }) {
+            trackList[index] = track
+        }
+        searchIndex.remove([track.id])
+        searchIndex.add([track])
+        let newKeys = Set(track.tags.keys).subtracting(tagKeys)
+        if !newKeys.isEmpty { tagKeys = (tagKeys + newKeys).sorted() }
+        arrange()
+    }
+
+    /// The copies in the group holding `id`, in group order.
+    func copies(inGroupOf id: Track.ID) -> [Track] {
+        groups.first { $0.trackIDs.contains(id) }?.trackIDs.compactMap { tracks[$0] } ?? []
+    }
+
     /// Puts back copies whose removal was undone, then finds duplicates again.
     func restore(_ restored: [Track]) {
         guard !restored.isEmpty else { return }
@@ -248,6 +291,12 @@ final class ResultsModel {
     }
 }
 
+/// Which copy to copy tags from, for the Copy Tags sheet.
+struct TagCopyRequest: Identifiable, Equatable {
+    var source: Track.ID
+    var id: Track.ID { source }
+}
+
 /// Match settings and the column layout, kept in user defaults.
 struct ResultsSettings {
     let defaults: UserDefaults
@@ -257,6 +306,9 @@ struct ResultsSettings {
         static let columns = "resultColumns"
         static let columnWidths = "resultColumnWidths"
         static let keeperRules = "keeperRules"
+        static let savedPresets = "matchPresets"
+        static let order = "groupOrder"
+        static let minimumConfidence = "minimumConfidence"
     }
 
     /// Falls back to the standard settings if the saved ones can't be read,
@@ -293,5 +345,42 @@ struct ResultsSettings {
         nonmutating set {
             defaults.set(try? JSONEncoder().encode(newValue), forKey: Key.keeperRules)
         }
+    }
+
+    var savedPresets: [SavedPreset] {
+        get {
+            defaults.data(forKey: Key.savedPresets).flatMap { try? JSONDecoder().decode([SavedPreset].self, from: $0) } ?? []
+        }
+        nonmutating set {
+            defaults.set(try? JSONEncoder().encode(newValue), forKey: Key.savedPresets)
+        }
+    }
+
+    /// Saved as "confidence", "copies", or "column:<id>:ascending" or ":descending".
+    var order: GroupOrder {
+        get {
+            let parts = (defaults.string(forKey: Key.order) ?? "").split(separator: ":", maxSplits: 1).map(String.init)
+            switch parts.first {
+            case "copies": return .copies
+            case "column" where parts.count == 2:
+                let rest = parts[1]
+                guard let colon = rest.lastIndex(of: ":"), let column = TrackColumn(id: String(rest[..<colon])) else { return .confidence }
+                return .column(column, ascending: rest[rest.index(after: colon)...] == "ascending")
+            default: return .confidence
+            }
+        }
+        nonmutating set {
+            let value = switch newValue {
+            case .confidence: "confidence"
+            case .copies: "copies"
+            case .column(let column, let ascending): "column:\(column.id):\(ascending ? "ascending" : "descending")"
+            }
+            defaults.set(value, forKey: Key.order)
+        }
+    }
+
+    var minimumConfidence: Double {
+        get { defaults.double(forKey: Key.minimumConfidence) }
+        nonmutating set { defaults.set(newValue, forKey: Key.minimumConfidence) }
     }
 }

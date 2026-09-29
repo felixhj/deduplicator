@@ -2,15 +2,30 @@ import SwiftUI
 
 @main
 struct DeduplicatorApp: App {
+    @NSApplicationDelegateAdaptor private var appDelegate: AppDelegate
     @State private var library = LibraryModel()
+    @AppStorage("showsMatchSettings") private var showsMatchSettings = true
+    @Environment(\.openWindow) private var openWindow
 
     var body: some Scene {
         Window("Deduplicator", id: "main") {
             ContentView()
                 .environment(library)
                 .frame(minWidth: 720, minHeight: 420)
+                .onAppear { appDelegate.isChangingFiles = { [library] in library.isChangingFiles } }
         }
         .commands {
+            CommandGroup(replacing: .appInfo) {
+                Button("About Deduplicator") { Self.showAboutPanel() }
+            }
+            CommandGroup(after: .sidebar) {
+                Button(showsMatchSettings ? "Hide Match Settings" : "Show Match Settings") { showsMatchSettings.toggle() }
+                    .keyboardShortcut("i", modifiers: [.command, .option])
+            }
+            CommandGroup(replacing: .help) {
+                Button("Keyboard Shortcuts") { openWindow(id: "shortcuts") }
+                    .keyboardShortcut("?")
+            }
             CommandGroup(after: .newItem) {
                 Button("Add Folder…") { library.isChoosingFolders = true }
                     .keyboardShortcut("o")
@@ -30,16 +45,39 @@ struct DeduplicatorApp: App {
             }
             CommandGroup(after: .pasteboard) {
                 Divider()
+                Button("Find…") { library.results.filterFocusRequests += 1 }
+                    .keyboardShortcut("f")
+                    .disabled(!library.hasResults)
+                Divider()
                 Button("Auto-Select Keepers…") { library.results.isAutoSelecting = true }
                     .disabled(!library.canAutoSelect)
                 Button("Unmark All") { library.results.unmarkAll() }
                     .disabled(library.results.marked.isEmpty || library.removal.isBusy)
+                Divider()
+                Button("Copy Tags…") {
+                    if let id = library.results.selection.first { library.results.tagCopyRequest = TagCopyRequest(source: id) }
+                }
+                .disabled(!library.canCopyTags)
             }
         }
 
         Settings {
             SettingsView()
         }
+
+        Window("Keyboard Shortcuts", id: "shortcuts") {
+            ShortcutsView()
+        }
+        .windowResizability(.contentSize)
+    }
+
+    /// The standard panel, crediting the libraries the app is built on.
+    private static func showAboutPanel() {
+        let credits = NSAttributedString(
+            string: "Finds duplicate music by comparing tags.\n\nReads and writes tags with TagLib (LGPL 2.1 or MPL 1.1) and utfcpp (Boost Software License).",
+            attributes: [.font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize), .foregroundColor: NSColor.secondaryLabelColor]
+        )
+        NSApp.orderFrontStandardAboutPanel(options: [.credits: credits])
     }
 
     /// "Undo Removal of 12 Files", so it's clear what goes back, even after a relaunch.

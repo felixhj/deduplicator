@@ -1,0 +1,33 @@
+{
+  "fill" : {
+    "linear-gradient" : [
+      "srgb:0.25000,0.36000,0.96000,1.00000",
+      "srgb:0.50000,0.23000,0.82000,1.00000"
+    ]
+  },
+  "groups" : [
+    {
+      "layers" : [
+        {
+          "image-name" : "Waveform.svg",
+          "name" : "Waveform"
+        },
+        {
+          "image-name" : "FrontCard.svg",
+          "name" : "Front Card"
+        }
+      ]
+    },
+    {
+      "layers" : [
+        {
+          "image-name" : "BackCard.svg",
+          "name" : "Back Card"
+        }
+      ]
+    }
+  ],
+  "supported-platforms" : {
+    "squares" : "shared"
+  }
+}

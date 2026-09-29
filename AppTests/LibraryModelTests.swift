@@ -61,6 +61,12 @@ struct LibraryModelTests {
         library.cancelScan()
     }
 
+    @Test func nothingIsChangingFilesAtFirst() {
+        let library = LibraryModel(defaults: storage.defaults, cacheURL: nil, waveformFolder: nil, removalLog: nil)
+        #expect(!library.isChangingFiles)
+        #expect(!library.hasResults)
+    }
+
     @Test func scanNeedsAFolder() {
         let library = LibraryModel(defaults: storage.defaults, cacheURL: nil, waveformFolder: nil, removalLog: nil)
         #expect(!library.canScan)

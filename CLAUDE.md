@@ -48,11 +48,13 @@ The code is split into three layers. Keep the boundaries strict.
    depends on the `DedupCore` and `DedupScanner` products. The results table is
    an `NSTableView` (see `App/Results/Table/`). The player (`App/Player/`)
    plays through `AVAudioPlayer`. `App/Removal/` runs removal, undo and
-   auto-select; every file it moves goes through `RemovalExecutor`. Tag
-   writing (phase 8) goes through `TagLibFile.write`. `AppTests/` holds tests
-   hosted in the app, for the models, the table, the player and removal. The
-   player tests play silent files, and the removal tests move real files
-   within their own temporary folder, which also stands in for the Bin.
+   auto-select; every file it moves goes through `RemovalExecutor`.
+   `App/Tags/` copies tags between copies; every tag it writes goes through
+   `TagLibFile.write`, and is logged. `App/AppIcon.icon` is the app icon, an
+   Icon Composer file. `AppTests/` holds tests hosted in the
+   app, for the models, the table, the player, removal and tag copying. The
+   player tests play silent files, and the removal and tag tests change real
+   files within their own temporary folder, which also stands in for the Bin.
 
 ## Conventions
 
@@ -69,6 +71,8 @@ The code is split into three layers. Keep the boundaries strict.
   permanently: files only go to the Bin or a user-chosen folder. Log every
   operation.
 - UI copy uses British English ("Bin", "normalise").
+- When a feature is added or changes, add what a person should check by hand
+  to `docs/TESTING.md`.
 - Keep functions small. Add comments only where the intent isn't obvious.
 
 ## Commands

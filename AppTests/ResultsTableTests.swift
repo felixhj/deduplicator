@@ -173,15 +173,20 @@ extension ResultsTableTests {
     @Test func rowMenuMarksKeepsAndNeedsASelection() async throws {
         let (model, table) = try await makeTable()
         let menu = try #require(table.tableView.menu)
-        #expect(menu.items.map(\.title) == ["Mark for Removal", "Keep", "", "Show in Finder"])
+        #expect(menu.items.map(\.title) == ["Mark for Removal", "Keep", "", "Copy Tags from This Copy…", "Show in Finder"])
         #expect(!table.validateMenuItem(menu.items[0]))
 
         table.tableView.selectRowIndexes([5, 6], byExtendingSelection: false)
         #expect(table.validateMenuItem(menu.items[0]))
+        #expect(!table.validateMenuItem(menu.items[3]), "Copying tags starts from one copy")
         menu.performActionForItem(at: 0)
         #expect(model.marked == [3, 4])
         menu.performActionForItem(at: 1)
         #expect(model.marked.isEmpty)
+
+        table.tableView.selectRowIndexes([6], byExtendingSelection: false)
+        menu.performActionForItem(at: 3)
+        #expect(model.tagCopyRequest == TagCopyRequest(source: 4))
     }
 
     @Test func headerMenuListsColumnsAndTags() async throws {
@@ -309,6 +314,22 @@ extension ResultsTableTests {
         table.player.pause()
         table.update()
         #expect(playCell(table, row: 5)?.symbolName == "speaker.fill")
+    }
+
+    @Test func leftAndRightSkipThroughTheCopyInThePlayer() async throws {
+        let (_, table) = try await makeTable(playable: true)
+        let tableView = table.tableView
+        let left = String(Character(UnicodeScalar(NSLeftArrowFunctionKey)!))
+        let right = String(Character(UnicodeScalar(NSRightArrowFunctionKey)!))
+        tableView.keyDown(with: keyEvent(right, keyCode: 124))
+        #expect(table.player.track == nil, "With nothing in the player, the keys do nothing")
+
+        tableView.selectRowIndexes([1], byExtendingSelection: false)
+        table.player.seek(to: 1)
+        tableView.keyDown(with: keyEvent(left, keyCode: 123))
+        #expect(table.player.position == 0)
+        tableView.keyDown(with: keyEvent(right, keyCode: 124))
+        #expect(table.player.position == 2, "Up to the end of the two-second copy")
     }
 
     @Test func whilePlayingTheSelectionTakesOver() async throws {

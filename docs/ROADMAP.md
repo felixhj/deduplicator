@@ -14,8 +14,8 @@ checked on a Mac.
 | 5 | Results UI: flat banded table, collapsible groups, dynamic tag columns, diff highlighting, match settings panel | ✅ done. The results logic is tested anywhere; the table and models by app tests in Xcode |
 | 6 | Player: transport, A/B at the same position, waveform | ✅ done. The waveform logic is tested anywhere, the waveform reader with `swift test` on a Mac, the player and table by app tests in Xcode |
 | 7 | Removal: confirm sheet, Bin or mirrored move, JSON log, undo; auto-select keepers with editable rules and a preview (SPEC §6) | ✅ done. The plan, keeper, executor and log logic is tested anywhere; removal, undo and auto-select by app tests in Xcode, with real files |
-| 8 | Basic tag editing: copy tags to the keeper via TagLib | ❌ Mac |
-| 9 | Polish: settings persistence, presets UI, keyboard shortcuts, app icon | ❌ Mac |
+| 8 | Basic tag editing: copy tags to the keeper via TagLib | ✅ done. The comparison logic is tested anywhere, re-reading a file with `swift test` on a Mac, and writing real files by app tests in Xcode |
+| 9 | Polish: settings persistence, presets UI, keyboard shortcuts, app icon | ✅ done. Saved presets and remembered settings are tested by app tests in Xcode; the icon, menus and windows by looking |
 
 ## Key technical choices
 
@@ -40,3 +40,7 @@ checked on a Mac.
   ready.
 - **Waveforms** are decoded with `AVAudioFile` and measured slice by slice with
   vDSP. Five minutes of FLAC or AAC takes about 0.15 s, even in a debug build.
+- **The app icon** is an Icon Composer file (`App/AppIcon.icon`: `icon.json`
+  and three SVG layers), so macOS 26 draws it in its own style. Xcode
+  compiles it into `Assets.car` and an `.icns` for macOS 15. Icon Composer
+  (in Xcode's Applications folder) can open and edit it.
