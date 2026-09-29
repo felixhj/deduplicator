@@ -1,32 +1,46 @@
-# Handoff: cloud session → local Claude (VS Code)
+# Handoff
 
-Read this, then `CLAUDE.md`, `docs/SPEC.md` and `docs/ROADMAP.md`. Branch:
-`claude/dazzling-dirac-3458nk`. It hasn't been merged to `main`, and there's no PR.
+Read this, then `CLAUDE.md`, `docs/SPEC.md` and `docs/ROADMAP.md`. Phase 4
+is on branch `claude/phase-4-app-shell`, which was committed locally but not
+pushed (2026-09-29).
 
 ## Where we are
 
-- Phases 0–3 (scaffolding plus the whole `DedupCore` engine) are written and
-  pushed, but have **never been compiled or run**. The cloud container couldn't
-  install Swift because `download.swift.org` was blocked. Expect some compile
-  errors or test failures.
-- Phases 4–9 (the Mac app) haven't been started. There's no `project.yml` or
-  `App/` yet.
+- Phases 0–3 (the `DedupCore` engine) compile, and all their tests pass on
+  macOS with Swift 6.3.3. They needed no code changes.
+- Phase 4 is written:
+  - `CTagLib` (TagLib 2.3.2, vendored, with a C interface) and `DedupScanner`
+    (folder scanning, tag and duration reading, the scan cache) are package
+    targets. Their tests pass on macOS, including end-to-end scans of real
+    AAC, ALAC, FLAC, AIFF, WAV and MP3 files.
+  - `project.yml` and a SwiftUI shell in `App/`: a folder list, Scan with
+    progress and Stop, and a summary with any problems.
+- The Mac used so far only has the Command Line Tools, so **the app hasn't been
+  built in Xcode or run**. `scripts/check-app.sh` compiles and links its
+  sources, and `xcodegen` generates a project that `plutil` accepts.
+- Nothing has been built on Linux since TagLib was added.
 
-## Do this first
+## Do this first, on a Mac with Xcode
 
-1. `swift build && swift test` in the repo root. Fix every compile error and
-   failing test before touching the app. When a test fails, decide whether the
-   code or the expectation is wrong. The expectations were reasoned out by hand,
-   never run.
-2. Then start phase 4.
+1. `scripts/test.sh`. All tests should pass.
+2. `xcodegen && open Deduplicator.xcodeproj`, then build and run. Check:
+   - Xcode resolves the Swift package, which sits in the project's own folder
+     (`path: .`). XcodeGen always adds a local package twice: as a package
+     reference and as a folder under "Packages". If Xcode objects, generate
+     the project into a subfolder so it isn't next to `Package.swift`.
+   - The C++ `CTagLib` target builds and links in Xcode.
+   - Scanning a real music folder gives the right tags, formats and durations
+     for a few files you know. A second scan should say most tracks came from
+     the scan cache.
+3. Then start phase 5.
 
 ## Decisions already made with the user (don't re-ask)
 
 - macOS 15+, for personal use with no App Sandbox. XcodeGen `project.yml`.
   Swift 6 with strict concurrency.
 - Formats: MP3, AAC/M4A, ALAC, FLAC, AIFF, WAV. Tags are read and written with
-  **TagLib** (a C++ bridge in the app target). Duration comes from the
-  **decoded audio** (`AVAudioFile` frames ÷ sample rate), never a tag.
+  **TagLib**. Duration comes from the **decoded audio** (`AVAudioFile` frames ÷
+  sample rate), never a tag.
 - Scale: **50k+ tracks**. Needs a scan cache, concurrent scanning, blocking,
   and a virtualised table.
 - Only folders are sources: no Music.app, Swinsian or Rekordbox import.
@@ -48,83 +62,75 @@ Read this, then `CLAUDE.md`, `docs/SPEC.md` and `docs/ROADMAP.md`. Branch:
 
 ## Engine map (`Sources/DedupCore`)
 
-- `Model/Track.swift` has `Track` (id: Int, url, scanRoot, title, artist,
-  album, albumArtist, track/disc/year, comment, genre, decoded `duration`,
-  `AudioProperties`, fileSize, modified, and `tags: [String: String]` holding
-  every tag), `AudioFormat` (with `isLossless`, `supportedExtensions`).
-- `Normalisation/`:
-  - `TextFolding`: whitespace, dashes and quotes, diacritics (plus a manual map
-    for ß, ø, æ and similar), `&`→and, punctuation, leading "The", splitting on
-    a spaced dash.
-  - `Brackets`: top-level `()[]{}` segments.
-  - `VersionClassifier`: `.neutral` (Original Mix, Radio Edit, 2011 Remaster),
-    `.distinct` (Remix, Dub, VIP, Live, Club Mix, "X Edit"), or `.notAVersion`
-    (Part 2).
-  - `CreditParser`: `splitFeatured`, `splitCollaborators`,
-    `removingTrackNumberPrefix`.
-  - `NormalisationOptions`: every toggle, plus `VersionStripping` (`off`,
-    `neutralOnly`, `allVersions`). Presets are `.minimal` (the default),
-    `.tidy`, `.djLibrary` and `.aggressive`.
-  - `Normaliser`: produces `NormalisedTags` (title, sorted primary artists,
-    featured artists, `removedFromTitle`).
-- `Matching/`:
-  - `Similarity`: Levenshtein ratio (used for Similar), and max of Jaro-Winkler
-    and token-sort (used for Fuzzy).
-  - `MatchCriteria`: a `FieldRule` (`MatchLevel` identical/same/similar/fuzzy/
-    ignore, plus a threshold) for title and artist, `artistSubsetMatches`,
-    `extraFields`, `durationTolerance` (default 3 s; nil means off; unknown
-    durations pass), `Comparison` (any/same/different) for track number, album
-    and format, `detectSwappedFields`, `requireAnchorMatch`. Presets are
-    `.standard`, `.djLibrary` and `.loose`.
-  - `MatchEngine.findDuplicates(in:progress:) async throws`:
-    1. prepare
-    2. block: on an exact title or artist key when possible, otherwise on
-       tokens. Buckets larger than `maxBucketSize` are split by the first 3
-       characters of the other field.
-    3. compare in parallel with a `TaskGroup`. Each pair is compared only in its
-       first shared bucket.
-    4. group with union-find, then the anchor split: each subgroup is the member
-       with the highest degree plus its direct neighbours.
+- `Model/Track.swift`: `Track` (id, url, scanRoot, the main tag fields, decoded
+  `duration`, `AudioProperties`, file size and date, and `tags` holding every
+  tag) and `AudioFormat`.
+- `Normalisation/`: `TextFolding`, `Brackets`, `VersionClassifier`,
+  `CreditParser`, `NormalisationOptions` (with presets) and `Normaliser`.
+- `Matching/`: `Similarity`, `MatchCriteria` (with presets) and
+  `MatchEngine.findDuplicates(in:progress:)`, which blocks, compares in
+  parallel and groups with union-find plus an anchor check.
+- `Selection/`: `KeeperSelector`, `RemovalPlanner`, `RemovalExecutor` (through
+  `FileMover`) and `RemovalLog`.
 
-    It returns `[DuplicateGroup]` (trackIDs with the anchor first, confidence,
-    `[MatchReason]`). `match(a, b)` compares two tracks directly.
-- `Selection/`:
-  - `KeeperSelector`: `KeeperRule` ranks candidates in order and ties go to the
-    earlier track. `autoSelect` returns the IDs to remove.
-  - `RemovalPlanner`: plans the Bin or a mirrored move (root folders with the
-    same name get "Music 2"), plus `uniqueDestination` ("x 2.mp3").
-  - `RemovalExecutor`: works through the `FileMover` protocol.
-    `LocalFileMover` is macOS-only (`#if os(macOS)`). Undo refuses to
-    overwrite.
-  - `RemovalLog`: stored as JSON. Has `lastUndoable` and `markUndone`.
-- Tests (Swift Testing) are in `Tests/DedupCoreTests`, one file per area. They
-  include a 50k synthetic scale test.
+## Scanner map (`Sources/DedupScanner`, `Sources/CTagLib`)
 
-## Known risk areas to check when compiling
+- `CTagLib`: TagLib's sources, hand-written `config/` headers, and
+  `CTagLib.h`/`CTagLib.cpp`. The C interface opens a file read-only or
+  writable, and returns audio properties with the codec (telling AAC and ALAC
+  apart in MP4 files) and TagLib's unified property map. It can also set a
+  property and save. Its README explains how to update TagLib.
+- `TagLibFile.read` and `.write`: the Swift side of that interface.
+- `DecodedAudio.read` (macOS only): `AVAudioFile` length ÷ sample rate, and
+  the codec Core Audio reports.
+- `FolderEnumerator`: resolves each folder's real path, so a folder that's a
+  symbolic link is followed and the same folder is never scanned twice. File
+  URLs are rebuilt under the folder the user chose, so they always start with
+  `scanRoot`.
+- `TrackBuilder`: TagLib properties to `Track` fields ("3/12" → 3, the first
+  four-digit run → year), with several values joined by "; ". The format
+  comes from TagLib's codec, then Core Audio's, then the extension.
+- `AudioFileReader`: TagLib plus decoded duration. A file that fails still
+  becomes a track, with its problems listed.
+- `ScanCache`: JSON keyed by path and checked against size and modification
+  date. Bump `ScanCache.version` when readers start storing something new.
+- `LibraryScanner.scan(_:progress:)`: loads the cache while finding files,
+  reads cache misses in a bounded task group, and reports progress at most ten
+  times a second. Cancelling keeps what was read. It drops cache entries for
+  deleted files, and only saves the cache when something changed. Tracks are
+  sorted by path, and each `id` is its index.
+- On an Apple silicon Mac, with 20,000 small MP3s already in the disk cache,
+  the first scan took 1.6 s and a rescan 0.4 s. The cache is about 0.9 KB per
+  track.
 
-- Swift Testing parameterised tests with tuple arguments, including nested
-  tuples in `CreditParserTests.splitsFeatured`.
-- `KeeperRule.rank` is a switch expression that mixes `Double` and `Double?`
-  branches.
-- `NSLock.withLock` in `FakeFileMover`.
-- Duration tolerance boundaries, and the anchor-grouping expectations in
-  `MatchEngineTests.anchorCheckBreaksChains` and `trackNumberConstraint`. A
-  chain a–b–c–d gives {a, b, c}, and d is dropped.
+## App map (`App/`)
 
-## Next: phase 4 (app shell)
+- `DeduplicatorApp`: one `Window`, with Add Folder… (⌘O), Scan (⌘R) and Stop
+  Scan (⌘.) commands.
+- `LibraryModel` (`@MainActor`, `@Observable`): the folders (kept in
+  `UserDefaults`), scan state, tracks and issues.
+- `AppFolders`: `~/Library/Application Support/Deduplicator`, which the removal
+  log will share.
+- Views: `ContentView` (split view, toolbar, folder picker), `FolderList` (add,
+  remove, drop) and `ScanStatusView` (progress, then a summary).
 
-- `project.yml`:
-  - a macOS 15 app target `Deduplicator` with sources in `App/`
-  - a dependency on the local `DedupCore` package
-  - TagLib, either via SwiftPM or vendored and built from source, reached
-    through an Objective-C++ or C shim (read all properties and tags, plus
-    write for phase 8)
-  - `Deduplicator.xcodeproj/` stays gitignored
-- Scanner:
-  - recursive enumeration of `AudioFormat.supportedExtensions`
-  - a bounded `TaskGroup` that reads tags and audio properties (TagLib) and
-    decoded duration (`AVAudioFile`), and resolves `.m4a` to AAC or ALAC from
-    the codec
-  - a scan cache (path, size and mtime → `Track`) in Application Support, with
-    progress and cancel
-- Then phases 5–9, as listed in `docs/ROADMAP.md`.
+## Things learned the hard way
+
+- Without Xcode, `swift test` can't find Swift Testing. Use `scripts/test.sh`.
+- `FileManager`'s URL enumerator returns real paths (`/private/var/...` for
+  `/var/...`), and returns nothing for a root that is a symbolic link.
+  `standardizedFileURL` and `resolvingSymlinksInPath()` strip `/private`
+  instead, so only `realpath` matches the enumerator.
+- TagLib opens any `.mp3`, even one with no MPEG frames. The C interface
+  reports no audio stream for it, so the extension decides the format.
+- Core Audio's FLAC encoder writes 24-bit files from float samples. The test
+  fixtures encode from 16-bit integers. There's no MP3 encoder, so MP3
+  fixtures are hand-made silent frames.
+
+## Next: phase 5 (results UI)
+
+See `docs/ROADMAP.md` and SPEC §4. After a scan, run `MatchEngine` off the main
+actor with settings from a match settings panel. Then show the groups in one
+flat banded table with collapsible groups, with columns for any key in
+`Track.tags` and differing values highlighted. Try SwiftUI `Table` first, and
+fall back to `NSTableView` if 50k rows are too slow.

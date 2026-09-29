@@ -49,34 +49,36 @@ each field.
 ## Requirements
 
 - macOS 15 (Sequoia) or later
-- Xcode 16+ and Swift 6 to build
+- Xcode 16+ and Swift 6 to build the app. The Swift package builds and tests
+  with just the Command Line Tools.
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`)
 
 ## Building
 
-The matching engine (`DedupCore`) is a Swift package:
-
 ```sh
 swift build
-swift test
+scripts/test.sh    # runs `swift test`; also works with only the Command Line Tools
+xcodegen           # generates Deduplicator.xcodeproj, which isn't committed
+open Deduplicator.xcodeproj
 ```
-
-The macOS app target (`project.yml`, built with XcodeGen) arrives in
-phase 4. See `docs/ROADMAP.md`.
 
 ## Project layout
 
 ```
 project.yml              XcodeGen spec for the macOS app
-Package.swift            SwiftPM manifest for DedupCore
+Package.swift            SwiftPM manifest: DedupCore, DedupScanner and CTagLib
 Sources/DedupCore/       Platform-independent matching engine (normalisation,
-                         similarity, grouping). Unit-tested, and builds on Linux too.
-App/                     macOS SwiftUI app: scanning, TagLib bridge, UI, player,
-                         and file operations.
-Tests/DedupCoreTests/    Tests for the engine.
+                         similarity, grouping, removal plans). Builds on Linux too.
+Sources/DedupScanner/    Folder scanning: finds audio files, reads tags with
+                         TagLib, measures decoded duration, keeps the scan cache.
+Sources/CTagLib/         TagLib, vendored as source, with a small C interface.
+App/                     macOS SwiftUI app: UI, player and file operations.
+Tests/                   Tests for DedupCore and DedupScanner.
+scripts/                 Test and build helpers.
 docs/                    Spec, roadmap and design notes.
 ```
 
 ## Licence
 
-TBD.
+TBD. The vendored TagLib is available under the LGPL 2.1 or the MPL 1.1, and
+utfcpp under the Boost Software License. See `Sources/CTagLib/licenses/`.

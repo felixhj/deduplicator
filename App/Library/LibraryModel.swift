@@ -1,0 +1,116 @@
+import DedupCore
+import DedupScanner
+import Foundation
+import Observation
+
+/// The folders to scan and the tracks found in them.
+@MainActor
+@Observable
+final class LibraryModel {
+    enum ScanState {
+        case idle
+        case scanning(ScanProgress)
+        case finished(ScanSummary)
+        case failed(String)
+    }
+
+    private(set) var folders: [URL]
+    private(set) var state: ScanState = .idle
+    private(set) var tracks: [Track] = []
+    private(set) var issues: [ScanIssue] = []
+    /// Set to show the folder picker, for example from the Add Folder command.
+    var isChoosingFolders = false
+
+    @ObservationIgnored private var scanTask: Task<Void, Never>?
+    @ObservationIgnored private var scanID = UUID()
+    @ObservationIgnored private let defaults: UserDefaults
+    private static let foldersKey = "scanFolders"
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        folders = (defaults.stringArray(forKey: Self.foldersKey) ?? [])
+            .map { URL(filePath: $0, directoryHint: .isDirectory) }
+    }
+
+    var isScanning: Bool {
+        if case .scanning = state { true } else { false }
+    }
+
+    var canScan: Bool { !isScanning && !folders.isEmpty }
+
+    func addFolders(_ urls: [URL]) {
+        let known = Set(folders.map(\.standardizedFileURL))
+        let new = urls.map(\.standardizedFileURL).filter { !known.contains($0) }
+        guard !new.isEmpty else { return }
+        folders += new
+        saveFolders()
+    }
+
+    func removeFolders(_ urls: Set<URL>) {
+        folders.removeAll { urls.contains($0) }
+        saveFolders()
+    }
+
+    func scan() {
+        guard canScan else { return }
+        let id = UUID()
+        scanID = id
+        let previous = state
+        state = .scanning(ScanProgress(phase: .finding, found: 0, completed: 0))
+        let scanner = LibraryScanner(cacheURL: AppFolders.scanCache)
+        let folders = folders
+        scanTask = Task {
+            let started = ContinuousClock.now
+            do {
+                let result = try await scanner.scan(folders) { progress in
+                    Task { @MainActor in self.show(progress, for: id) }
+                }
+                finish(result, elapsed: ContinuousClock.now - started)
+            } catch is CancellationError {
+                state = previous
+            } catch {
+                state = .failed(error.localizedDescription)
+            }
+        }
+    }
+
+    func cancelScan() {
+        scanTask?.cancel()
+    }
+
+    /// Progress arrives on separate tasks, so late reports from a scan that
+    /// has finished, or from an earlier scan, are dropped.
+    private func show(_ progress: ScanProgress, for id: UUID) {
+        guard id == scanID, isScanning else { return }
+        state = .scanning(progress)
+    }
+
+    private func finish(_ result: ScanResult, elapsed: Duration) {
+        tracks = result.tracks
+        issues = result.issues
+        state = .finished(ScanSummary(result: result, elapsed: elapsed))
+    }
+
+    private func saveFolders() {
+        defaults.set(folders.map { $0.path(percentEncoded: false) }, forKey: Self.foldersKey)
+    }
+}
+
+/// What the last scan found, for the status view.
+struct ScanSummary {
+    var trackCount: Int
+    var cachedCount: Int
+    var issueCount: Int
+    /// Formats in a fixed order, with how many tracks of each were found.
+    var formatCounts: [(format: AudioFormat, count: Int)]
+    var elapsed: Duration
+
+    init(result: ScanResult, elapsed: Duration) {
+        trackCount = result.tracks.count
+        cachedCount = result.cachedCount
+        issueCount = result.issues.count
+        let counts = Dictionary(grouping: result.tracks, by: \.audio.format).mapValues(\.count)
+        formatCounts = AudioFormat.allCases.compactMap { format in counts[format].map { (format, $0) } }
+        self.elapsed = elapsed
+    }
+}

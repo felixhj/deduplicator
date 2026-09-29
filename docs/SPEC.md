@@ -23,7 +23,21 @@ user choose which copies to remove, and remove them safely.
   - file info: path, size, format/codec, bitrate, sample rate, bit depth,
     channels, date modified
 - Scan results are cached, keyed by path, size and mtime, so rescans are fast.
-  This is required, because the target is **50k+ tracks**.
+  This is required, because the target is **50k+ tracks**. The cache is
+  `~/Library/Application Support/Deduplicator/ScanCache.json`. Entries for
+  files that have gone are dropped. Files that had problems aren't cached, so
+  they're read again next time.
+- Tags use TagLib's unified names (`TITLE`, `ARTIST`, `INITIALKEY`, …), so a
+  tag lines up across formats: an MP3's `TKEY` frame and a FLAC's `INITIALKEY`
+  comment are both `INITIALKEY`. A tag with several values shows them joined
+  with "; ".
+- Scanning skips hidden files (including "._" files), the contents of packages
+  such as Logic projects, and symbolic links to files, so a linked file isn't
+  matched with itself. A chosen folder that is itself a symbolic link is
+  followed. A folder inside another chosen folder, or the same folder chosen
+  twice by different paths, is only scanned once.
+- A file whose tags or audio can't be read is still listed, so the filename
+  fallback can match it, and the scan reports the problem.
 
 ## 3. Matching
 
