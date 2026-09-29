@@ -103,6 +103,10 @@ struct SnapshotTests {
         try await snapshot(CopyTagsSheet(request: TagCopyRequest(source: 1)).environment(library), as: "copy-tags-\(name)", appearance: appearance)
     }
 
+    @Test func help() async throws {
+        try await snapshot(HelpView(), as: "help", appearance: .aqua)
+    }
+
     @Test func keyboardShortcuts() async throws {
         try await snapshot(ShortcutsView(), as: "shortcuts", appearance: .darkAqua)
     }

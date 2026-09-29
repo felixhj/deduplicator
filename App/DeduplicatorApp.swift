@@ -4,6 +4,7 @@ import SwiftUI
 struct DeduplicatorApp: App {
     @NSApplicationDelegateAdaptor private var appDelegate: AppDelegate
     @State private var library = LibraryModel()
+    @State private var updates = UpdateChecker()
     @AppStorage("showsMatchSettings") private var showsMatchSettings = true
     @Environment(\.openWindow) private var openWindow
 
@@ -11,20 +12,23 @@ struct DeduplicatorApp: App {
         Window("Deduplicator", id: "main") {
             ContentView()
                 .environment(library)
+                .environment(updates)
                 .frame(minWidth: 720, minHeight: 420)
                 .onAppear { appDelegate.isChangingFiles = { [library] in library.isChangingFiles } }
         }
         .commands {
             CommandGroup(replacing: .appInfo) {
                 Button("About Deduplicator") { Self.showAboutPanel() }
+                Button("Check for Updates…") { Task { await updates.checkNow() } }
             }
             CommandGroup(after: .sidebar) {
                 Button(showsMatchSettings ? "Hide Match Settings" : "Show Match Settings") { showsMatchSettings.toggle() }
                     .keyboardShortcut("i", modifiers: [.command, .option])
             }
             CommandGroup(replacing: .help) {
-                Button("Keyboard Shortcuts") { openWindow(id: "shortcuts") }
+                Button("Deduplicator Help") { openWindow(id: "help") }
                     .keyboardShortcut("?")
+                Button("Keyboard Shortcuts") { openWindow(id: "shortcuts") }
             }
             CommandGroup(after: .newItem) {
                 Button("Add Folder…") { library.isChoosingFolders = true }
@@ -67,6 +71,11 @@ struct DeduplicatorApp: App {
 
         Window("Keyboard Shortcuts", id: "shortcuts") {
             ShortcutsView()
+        }
+        .windowResizability(.contentSize)
+
+        Window("Deduplicator Help", id: "help") {
+            HelpView()
         }
         .windowResizability(.contentSize)
     }

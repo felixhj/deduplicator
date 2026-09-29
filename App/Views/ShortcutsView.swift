@@ -23,6 +23,7 @@ struct ShortcutsView: View {
             ("⌥⌘I", "Show or hide the match settings"),
             ("⌥⌘S", "Show or hide the folders"),
             ("⌘,", "Settings"),
+            ("⌘?", "Help"),
         ]),
     ]
 

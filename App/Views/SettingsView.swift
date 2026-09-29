@@ -5,6 +5,7 @@ struct SettingsView: View {
     @AppStorage(PlayerModel.samePositionKey) private var switchesAtSamePosition = true
     @AppStorage(RemovalDestination.key) private var destination: RemovalDestination = .bin
     @AppStorage(RemovalDestination.folderKey) private var folderPath = ""
+    @AppStorage(UpdateChecker.checksAtLaunchKey) private var checksForUpdates = true
 
     var body: some View {
         Form {
@@ -31,6 +32,15 @@ struct SettingsView: View {
                 Text("Removal")
             } footer: {
                 Text("Nothing is ever deleted. In a folder, each file keeps the folders it was in below its scanned folder. Every removal can be undone from the File menu.")
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
+                Toggle("Check for a new version when Deduplicator opens", isOn: $checksForUpdates)
+            } header: {
+                Text("Updates")
+            } footer: {
+                Text("Asks GitHub for the latest release. Nothing about you or your music is sent.")
                     .foregroundStyle(.secondary)
             }
 

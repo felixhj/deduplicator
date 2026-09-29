@@ -3,6 +3,7 @@ import UniformTypeIdentifiers
 
 struct ContentView: View {
     @Environment(LibraryModel.self) private var library
+    @Environment(UpdateChecker.self) private var updates
 
     var body: some View {
         @Bindable var library = library
@@ -42,6 +43,12 @@ struct ContentView: View {
         }
         .sheet(item: $results.tagCopyRequest) { request in
             CopyTagsSheet(request: request).environment(library)
+        }
+        .updateAlert(updates)
+        .task {
+            // Tests run inside the app, and shouldn't ask GitHub anything.
+            guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else { return }
+            await updates.checkAtLaunch()
         }
     }
 
