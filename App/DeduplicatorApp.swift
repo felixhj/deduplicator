@@ -21,11 +21,30 @@ struct DeduplicatorApp: App {
                 Button("Stop Scan") { library.cancelScan() }
                     .keyboardShortcut(".")
                     .disabled(!library.isScanning)
+                Divider()
+                Button("Remove Marked Files…") { library.removal.isConfirmingRemoval = true }
+                    .keyboardShortcut(.delete)
+                    .disabled(!library.canRemove)
+                Button(undoTitle) { library.removal.isUndoing = true }
+                    .disabled(!library.canUndoRemoval)
+            }
+            CommandGroup(after: .pasteboard) {
+                Divider()
+                Button("Auto-Select Keepers…") { library.results.isAutoSelecting = true }
+                    .disabled(!library.canAutoSelect)
+                Button("Unmark All") { library.results.unmarkAll() }
+                    .disabled(library.results.marked.isEmpty || library.removal.isBusy)
             }
         }
 
         Settings {
             SettingsView()
         }
+    }
+
+    /// "Undo Removal of 12 Files", so it's clear what goes back, even after a relaunch.
+    private var undoTitle: String {
+        guard let count = library.removal.undoable?.records.count else { return "Undo Last Removal" }
+        return count == 1 ? "Undo Removal of 1 File" : "Undo Removal of \(count.formatted()) Files"
     }
 }

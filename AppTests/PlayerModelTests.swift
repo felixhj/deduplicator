@@ -153,7 +153,7 @@ struct PlayerModelTests {
     }
 
     @Test func closingTheResultsPauses() async throws {
-        let library = LibraryModel(defaults: storage.defaults, cacheURL: nil, waveformFolder: nil)
+        let library = LibraryModel(defaults: storage.defaults, cacheURL: nil, waveformFolder: nil, removalLog: nil)
         let tracks = try Fixtures.playableLibrary(in: folder.url)
         library.results.load(tracks)
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 900, height: 500), styleMask: [.titled], backing: .buffered, defer: false)

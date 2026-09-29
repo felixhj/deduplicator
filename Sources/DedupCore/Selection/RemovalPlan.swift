@@ -79,6 +79,18 @@ public enum RemovalPlanner {
         return names
     }
 
+    /// The first planned move whose destination is inside one of `folders`.
+    /// Files moved into a scanned folder would be found by the next scan. And
+    /// when the chosen folder holds a scanned folder of the same name as its
+    /// scan root, the mirrored path is the file's own path.
+    public static func moveIntoFolders(_ folders: [URL], in plan: [PlannedMove]) -> PlannedMove? {
+        let folderPaths = folders.map { $0.standardizedFileURL.pathComponents }
+        return plan.first { move in
+            guard let destination = move.destination?.standardizedFileURL.pathComponents else { return false }
+            return folderPaths.contains { destination.starts(with: $0) }
+        }
+    }
+
     /// `x.mp3` → `x 2.mp3`, `x 3.mp3`, … until `exists` returns false.
     public static func uniqueDestination(for url: URL, exists: (URL) -> Bool) -> URL {
         guard exists(url) else { return url }

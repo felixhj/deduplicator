@@ -16,12 +16,24 @@ public struct RemovalRecord: Sendable, Hashable, Codable {
     public var original: URL
     /// Where the file ended up (in the Bin or the chosen folder).
     public var destination: URL
+
+    public init(trackID: Track.ID, original: URL, destination: URL) {
+        self.trackID = trackID
+        self.original = original
+        self.destination = destination
+    }
 }
 
 public struct RemovalFailure: Sendable, Hashable, Codable {
     public var trackID: Track.ID
     public var source: URL
     public var message: String
+
+    public init(trackID: Track.ID, source: URL, message: String) {
+        self.trackID = trackID
+        self.source = source
+        self.message = message
+    }
 }
 
 /// One press of Remove, as written to the log.
@@ -33,6 +45,8 @@ public struct RemovalOperation: Sendable, Hashable, Codable, Identifiable {
     public var failures: [RemovalFailure]
     /// Set once the operation has been undone.
     public var undoneAt: Date?
+    /// Files the undo couldn't put back.
+    public var undoFailures: [RemovalFailure]
 
     public init(
         id: UUID = UUID(),
@@ -40,7 +54,8 @@ public struct RemovalOperation: Sendable, Hashable, Codable, Identifiable {
         mode: RemovalMode,
         records: [RemovalRecord] = [],
         failures: [RemovalFailure] = [],
-        undoneAt: Date? = nil
+        undoneAt: Date? = nil,
+        undoFailures: [RemovalFailure] = []
     ) {
         self.id = id
         self.date = date
@@ -48,6 +63,23 @@ public struct RemovalOperation: Sendable, Hashable, Codable, Identifiable {
         self.records = records
         self.failures = failures
         self.undoneAt = undoneAt
+        self.undoFailures = undoFailures
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, date, mode, records, failures, undoneAt, undoFailures
+    }
+
+    /// `undoFailures` may be missing, so fields added later don't make older logs unreadable.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        date = try container.decode(Date.self, forKey: .date)
+        mode = try container.decode(RemovalMode.self, forKey: .mode)
+        records = try container.decode([RemovalRecord].self, forKey: .records)
+        failures = try container.decode([RemovalFailure].self, forKey: .failures)
+        undoneAt = try container.decodeIfPresent(Date.self, forKey: .undoneAt)
+        undoFailures = try container.decodeIfPresent([RemovalFailure].self, forKey: .undoFailures) ?? []
     }
 }
 
@@ -65,10 +97,15 @@ public struct RemovalExecutor: Sendable {
         self.mover = mover
     }
 
-    /// Moves each file. A failure is recorded and the rest carry on.
-    public func execute(_ plan: [PlannedMove], mode: RemovalMode, date: Date = Date()) -> RemovalOperation {
+    /// Moves each file, calling `progress` with the number of files dealt
+    /// with so far. A failure is recorded and the rest carry on. If the task
+    /// running this is cancelled, it stops before the next file, and the
+    /// operation holds what was moved.
+    public func execute(_ plan: [PlannedMove], mode: RemovalMode, date: Date = Date(), progress: (Int) -> Void = { _ in }) -> RemovalOperation {
         var operation = RemovalOperation(date: date, mode: mode)
-        for move in plan {
+        for (done, move) in plan.enumerated() {
+            if Task.isCancelled { break }
+            defer { progress(done + 1) }
             do {
                 let destination: URL
                 if let planned = move.destination {
@@ -80,17 +117,19 @@ public struct RemovalExecutor: Sendable {
                 }
                 operation.records.append(RemovalRecord(trackID: move.trackID, original: move.source, destination: destination))
             } catch {
-                operation.failures.append(RemovalFailure(trackID: move.trackID, source: move.source, message: "\(error)"))
+                operation.failures.append(RemovalFailure(trackID: move.trackID, source: move.source, message: error.localizedDescription))
             }
         }
         return operation
     }
 
-    /// Moves files back to where they were. A file whose original location
-    /// is occupied again isn't overwritten; it's reported as a failure.
-    public func undo(_ operation: RemovalOperation) -> UndoResult {
+    /// Moves files back to where they were, calling `progress` with the
+    /// number dealt with so far. A file whose original location is occupied
+    /// again isn't overwritten; it's reported as a failure.
+    public func undo(_ operation: RemovalOperation, progress: (Int) -> Void = { _ in }) -> UndoResult {
         var result = UndoResult(restored: [], failures: [])
-        for record in operation.records.reversed() {
+        for (done, record) in operation.records.reversed().enumerated() {
+            defer { progress(done + 1) }
             do {
                 guard mover.fileExists(at: record.destination) else {
                     throw UndoError.missing(record.destination)
@@ -102,22 +141,24 @@ public struct RemovalExecutor: Sendable {
                 try mover.moveItem(at: record.destination, to: record.original)
                 result.restored.append(record)
             } catch {
-                result.failures.append(RemovalFailure(trackID: record.trackID, source: record.destination, message: "\(error)"))
+                result.failures.append(RemovalFailure(trackID: record.trackID, source: record.destination, message: error.localizedDescription))
             }
         }
         return result
     }
 
-    public enum UndoError: Error, CustomStringConvertible {
+    public enum UndoError: LocalizedError, CustomStringConvertible {
         case missing(URL)
         case occupied(URL)
 
-        public var description: String {
+        public var errorDescription: String? {
             switch self {
-            case .missing(let url): "File is no longer at \(url.path)"
-            case .occupied(let url): "Another file is already at \(url.path)"
+            case .missing(let url): "The file is no longer at \(url.path(percentEncoded: false))."
+            case .occupied(let url): "Another file is already at \(url.path(percentEncoded: false))."
             }
         }
+
+        public var description: String { errorDescription ?? "" }
     }
 }
 

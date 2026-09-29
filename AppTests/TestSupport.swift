@@ -81,10 +81,40 @@ extension Fixtures {
         return try library.map { track in
             var track = track
             track.url = folder.appending(path: "\(track.id) \(track.title).wav")
+            track.scanRoot = folder
             track.duration = seconds
             try FileManager.default.copyItem(at: original, to: track.url)
             return track
         }
+    }
+}
+
+/// Moves files as the app does, except that its Bin is a folder of the test's own.
+struct TestMover: FileMover {
+    let bin: URL
+    /// Seconds each move takes, as if the files were large.
+    var delay: TimeInterval = 0
+    private let local = LocalFileMover()
+
+    init(bin: URL, delay: TimeInterval = 0) {
+        self.bin = bin
+        self.delay = delay
+    }
+
+    func fileExists(at url: URL) -> Bool { local.fileExists(at: url) }
+
+    func createDirectory(at url: URL) throws { try local.createDirectory(at: url) }
+
+    func moveItem(at source: URL, to destination: URL) throws {
+        if delay > 0 { Thread.sleep(forTimeInterval: delay) }
+        try local.moveItem(at: source, to: destination)
+    }
+
+    func trashItem(at url: URL) throws -> URL {
+        try local.createDirectory(at: bin)
+        let destination = RemovalPlanner.uniqueDestination(for: bin.appending(path: url.lastPathComponent), exists: local.fileExists)
+        try moveItem(at: url, to: destination)
+        return destination
     }
 }
 

@@ -13,7 +13,7 @@ checked on a Mac.
 | 4 | App shell: `project.yml` (XcodeGen), TagLib integration, concurrent folder scanner, decoded duration via AVFoundation, scan cache | ✅ done, built and run in Xcode |
 | 5 | Results UI: flat banded table, collapsible groups, dynamic tag columns, diff highlighting, match settings panel | ✅ done. The results logic is tested anywhere; the table and models by app tests in Xcode |
 | 6 | Player: transport, A/B at the same position, waveform | ✅ done. The waveform logic is tested anywhere, the waveform reader with `swift test` on a Mac, the player and table by app tests in Xcode |
-| 7 | Removal: confirm sheet, Bin or mirrored move, JSON log, undo; auto-select keepers with editable rules and a preview (SPEC §6) | ❌ Mac (the plan and keeper logic are tested in phase 3) |
+| 7 | Removal: confirm sheet, Bin or mirrored move, JSON log, undo; auto-select keepers with editable rules and a preview (SPEC §6) | ✅ done. The plan, keeper, executor and log logic is tested anywhere; removal, undo and auto-select by app tests in Xcode, with real files |
 | 8 | Basic tag editing: copy tags to the keeper via TagLib | ❌ Mac |
 | 9 | Polish: settings persistence, presets UI, keyboard shortcuts, app icon | ❌ Mac |
 

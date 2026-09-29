@@ -19,7 +19,7 @@ struct LibraryModelTests {
             try TagLibFile.write(["TITLE": [title], "ARTIST": ["Derrick May"]], to: url)
         }
 
-        let library = LibraryModel(defaults: storage.defaults, cacheURL: folder.appending(path: "Cache/ScanCache.json"), waveformFolder: nil)
+        let library = LibraryModel(defaults: storage.defaults, cacheURL: folder.appending(path: "Cache/ScanCache.json"), waveformFolder: nil, removalLog: nil)
         library.addFolders([folder])
         library.scan()
         for _ in 0..<500 where library.isScanning {
@@ -41,19 +41,19 @@ struct LibraryModelTests {
     }
 
     @Test func foldersAreKeptWithoutDuplicates() {
-        let library = LibraryModel(defaults: storage.defaults, cacheURL: nil, waveformFolder: nil)
+        let library = LibraryModel(defaults: storage.defaults, cacheURL: nil, waveformFolder: nil, removalLog: nil)
         let music = URL(filePath: "/Music", directoryHint: .isDirectory)
         library.addFolders([music, URL(filePath: "/Music/", directoryHint: .isDirectory), URL(filePath: "/Other", directoryHint: .isDirectory)])
         #expect(library.folders.count == 2)
 
-        let reopened = LibraryModel(defaults: storage.defaults, cacheURL: nil, waveformFolder: nil)
+        let reopened = LibraryModel(defaults: storage.defaults, cacheURL: nil, waveformFolder: nil, removalLog: nil)
         #expect(reopened.folders.map { $0.path(percentEncoded: false) } == ["/Music/", "/Other/"])
         reopened.removeFolders([reopened.folders[0]])
-        #expect(LibraryModel(defaults: storage.defaults, cacheURL: nil, waveformFolder: nil).folders.count == 1)
+        #expect(LibraryModel(defaults: storage.defaults, cacheURL: nil, waveformFolder: nil, removalLog: nil).folders.count == 1)
     }
 
     @Test func scanningEmptiesThePlayer() {
-        let library = LibraryModel(defaults: storage.defaults, cacheURL: nil, waveformFolder: nil)
+        let library = LibraryModel(defaults: storage.defaults, cacheURL: nil, waveformFolder: nil, removalLog: nil)
         library.addFolders([URL(filePath: "/Nowhere", directoryHint: .isDirectory)])
         library.player.select(Fixtures.library[0], copies: Array(Fixtures.library.prefix(3)))
         library.scan()
@@ -62,7 +62,7 @@ struct LibraryModelTests {
     }
 
     @Test func scanNeedsAFolder() {
-        let library = LibraryModel(defaults: storage.defaults, cacheURL: nil, waveformFolder: nil)
+        let library = LibraryModel(defaults: storage.defaults, cacheURL: nil, waveformFolder: nil, removalLog: nil)
         #expect(!library.canScan)
         library.scan()
         #expect(!library.isScanning)

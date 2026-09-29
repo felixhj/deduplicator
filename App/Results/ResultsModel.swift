@@ -24,6 +24,9 @@ final class ResultsModel {
     private(set) var matchState: MatchState = .idle
     /// Changes whenever `shownGroups` or `tracks` do, so the table knows to reload.
     private(set) var revision = 0
+    /// Counts the scans loaded. Track IDs belong to one scan, so anything
+    /// holding IDs can tell when a new scan has replaced its own.
+    private(set) var generation = 0
 
     var criteria: MatchCriteria {
         didSet {
@@ -57,6 +60,14 @@ final class ResultsModel {
     private(set) var marksRevision = 0
     var selection: Set<Track.ID> = []
 
+    /// The rules auto-select keeps a copy by, in order.
+    var keeperRules: [KeeperRule] {
+        didSet { if keeperRules != oldValue { settings.keeperRules = keeperRules } }
+    }
+
+    /// Set to show the auto-select sheet, for example from the Edit menu.
+    var isAutoSelecting = false
+
     @ObservationIgnored private var trackList: [Track] = []
     @ObservationIgnored private var searchIndex = SearchIndex()
     @ObservationIgnored private var matchTask: Task<Void, Never>?
@@ -68,11 +79,13 @@ final class ResultsModel {
         criteria = settings.criteria
         columns = settings.columns
         columnWidths = settings.columnWidths
+        keeperRules = settings.keeperRules
     }
 
     /// Takes the tracks from a new scan. Marks are cleared, because track IDs
     /// belong to one scan.
     func load(_ tracks: [Track]) {
+        generation += 1
         trackList = tracks
         self.tracks = Dictionary(uniqueKeysWithValues: tracks.map { ($0.id, $0) })
         searchIndex = SearchIndex(tracks: tracks)
@@ -157,6 +170,64 @@ final class ResultsModel {
         marked.reduce(0) { $0 + (tracks[$1]?.fileSize ?? 0) }
     }
 
+    func unmarkAll() {
+        setMarked(marked, false)
+    }
+
+    // MARK: - Auto-select
+
+    /// What auto-select would do to the groups shown: keep one copy of each,
+    /// chosen by `keeperRules`, and mark the rest.
+    func keeperChoices() -> [KeeperChoice] {
+        KeeperSelector(rules: keeperRules).choices(for: shownGroups, tracks: tracks)
+    }
+
+    /// Marks every copy but the keeper in each group, replacing any marks
+    /// made by hand in those groups.
+    func apply(_ choices: [KeeperChoice]) {
+        let before = marked
+        marked.subtract(choices.map(\.keeper))
+        marked.formUnion(choices.flatMap(\.others))
+        if marked != before { marksRevision += 1 }
+    }
+
+    // MARK: - Removing and restoring
+
+    /// Takes removed copies out of the results. Their groups lose them, and
+    /// a group left with one copy goes. Matching runs without them from now
+    /// on, so changing the settings doesn't bring them back.
+    func remove(_ ids: Set<Track.ID>) {
+        guard !ids.isEmpty else { return }
+        trackList.removeAll { ids.contains($0.id) }
+        for id in ids { tracks[id] = nil }
+        searchIndex.remove(ids)
+        if !marked.isDisjoint(with: ids) {
+            marked.subtract(ids)
+            marksRevision += 1
+        }
+        selection.subtract(ids)
+        groups = groups.compactMap { group in
+            var group = group
+            group.trackIDs.removeAll(where: ids.contains)
+            return group.trackIDs.count > 1 ? group : nil
+        }
+        arrange()
+        if case .matching = matchState {
+            // The run under way still has them, so it starts again without.
+            match()
+        }
+    }
+
+    /// Puts back copies whose removal was undone, then finds duplicates again.
+    func restore(_ restored: [Track]) {
+        guard !restored.isEmpty else { return }
+        // Matching lists copies in scan order, which is ID order.
+        trackList = (trackList + restored).sorted { $0.id < $1.id }
+        for track in restored { tracks[track.id] = track }
+        searchIndex.add(restored)
+        match()
+    }
+
     var shownCopyCount: Int {
         shownGroups.reduce(0) { $0 + $1.trackIDs.count }
     }
@@ -185,6 +256,7 @@ struct ResultsSettings {
         static let criteria = "matchCriteria"
         static let columns = "resultColumns"
         static let columnWidths = "resultColumnWidths"
+        static let keeperRules = "keeperRules"
     }
 
     /// Falls back to the standard settings if the saved ones can't be read,
@@ -211,5 +283,15 @@ struct ResultsSettings {
     var columnWidths: [String: Double] {
         get { defaults.dictionary(forKey: Key.columnWidths) as? [String: Double] ?? [:] }
         nonmutating set { defaults.set(newValue, forKey: Key.columnWidths) }
+    }
+
+    var keeperRules: [KeeperRule] {
+        get {
+            defaults.data(forKey: Key.keeperRules).flatMap { try? JSONDecoder().decode([KeeperRule].self, from: $0) }
+                ?? KeeperSelector.defaultRules
+        }
+        nonmutating set {
+            defaults.set(try? JSONEncoder().encode(newValue), forKey: Key.keeperRules)
+        }
     }
 }

@@ -67,6 +67,14 @@ import Testing
         #expect(KeeperSelector().autoSelect(groups: groups, tracks: byID) == [1, 3, 4])
     }
 
+    @Test func choicesNameEachGroupsKeeper() {
+        let tracks = [track(1, .mp3, bitrate: 128), track(2, .flac), track(3, .mp3, bitrate: 320)]
+        let byID = Dictionary(uniqueKeysWithValues: tracks.map { ($0.id, $0) })
+        let groups = [DuplicateGroup(id: 7, trackIDs: [1, 2, 3], confidence: 1, reasons: [])]
+        #expect(KeeperSelector().choices(for: groups, tracks: byID) == [KeeperChoice(groupID: 7, keeper: 2, others: [1, 3])])
+        #expect(KeeperSelector().choices(for: groups, tracks: [:]).isEmpty, "A group whose tracks are gone has no keeper")
+    }
+
     @Test func rulesRoundTripThroughJSON() throws {
         let selector = KeeperSelector(rules: [.pathContains("x"), .preferFormat(.flac), .newerFile])
         let data = try JSONEncoder().encode(selector)
@@ -101,6 +109,19 @@ import Testing
         let t = track(1, "/somewhere/Album/x.mp3", root: nil)
         let plan = RemovalPlanner.plan([t], mode: .moveToFolder(URL(fileURLWithPath: "/Dupes")))
         #expect(plan[0].destination?.path == "/Dupes/Album/x.mp3")
+    }
+
+    @Test func movesIntoScannedFoldersAreFound() {
+        let t = track(1, "/Users/me/Music/House/x.mp3", root: "/Users/me/Music")
+        let scanned = [URL(fileURLWithPath: "/Users/me/Music")]
+        func check(_ folder: String) -> PlannedMove? {
+            RemovalPlanner.moveIntoFolders(scanned, in: RemovalPlanner.plan([t], mode: .moveToFolder(URL(fileURLWithPath: folder))))
+        }
+        #expect(check("/Users/me/Music/Dupes") != nil, "Inside the scanned folder")
+        #expect(check("/Users/me")?.destination?.path == "/Users/me/Music/House/x.mp3", "Onto the file itself")
+        #expect(check("/Users/me/Dupes") == nil)
+        #expect(check("/Users/me/Musical") == nil, "A name that merely starts the same")
+        #expect(RemovalPlanner.moveIntoFolders(scanned, in: RemovalPlanner.plan([t], mode: .moveToBin)) == nil)
     }
 
     @Test func uniqueDestination() {
@@ -203,6 +224,58 @@ final class FakeFileMover: FileMover, @unchecked Sendable {
         let result = RemovalExecutor(mover: occupied).undo(op)
         #expect(result.restored.isEmpty)
         #expect(result.failures.count == 1)
+    }
+
+    @Test func reportsProgress() {
+        let fs = FakeFileMover(files: ["/m/x.mp3", "/m/y.mp3"])
+        let executor = RemovalExecutor(mover: fs)
+        var done: [Int] = []
+        let op = executor.execute(RemovalPlanner.plan([track(1, "/m/x.mp3"), track(2, "/m/y.mp3")], mode: .moveToBin), mode: .moveToBin) {
+            done.append($0)
+        }
+        #expect(done == [1, 2])
+        done = []
+        _ = executor.undo(op) { done.append($0) }
+        #expect(done == [1, 2])
+    }
+
+    @Test func stopsWhenCancelled() async {
+        let fs = FakeFileMover(files: ["/m/x.mp3", "/m/y.mp3", "/m/z.mp3"])
+        let plan = RemovalPlanner.plan([track(1, "/m/x.mp3"), track(2, "/m/y.mp3"), track(3, "/m/z.mp3")], mode: .moveToBin)
+        let op = await Task {
+            RemovalExecutor(mover: fs).execute(plan, mode: .moveToBin) { done in
+                if done == 1 { withUnsafeCurrentTask { $0?.cancel() } }
+            }
+        }.value
+        #expect(op.records.map(\.trackID) == [1])
+        #expect(op.failures.isEmpty)
+        #expect(fs.paths == ["/Trash/x.mp3", "/m/y.mp3", "/m/z.mp3"])
+    }
+
+    @Test func undoFailuresSayWhy() {
+        let fs = FakeFileMover(files: ["/m/x.mp3"])
+        let executor = RemovalExecutor(mover: fs)
+        let op = executor.execute(RemovalPlanner.plan([track(1, "/m/x.mp3")], mode: .moveToBin), mode: .moveToBin)
+        let emptied = RemovalExecutor(mover: FakeFileMover(files: [])).undo(op)
+        #expect(emptied.failures.map(\.message) == ["The file is no longer at /Trash/x.mp3."])
+        let occupied = RemovalExecutor(mover: FakeFileMover(files: ["/Trash/x.mp3", "/m/x.mp3"])).undo(op)
+        #expect(occupied.failures.map(\.message) == ["Another file is already at /m/x.mp3."])
+    }
+
+    @Test func logKeepsUndoFailuresAndReadsOlderEntries() throws {
+        var log = RemovalLog()
+        let op = RemovalOperation(mode: .moveToBin, records: [
+            RemovalRecord(trackID: 1, original: URL(fileURLWithPath: "/a"), destination: URL(fileURLWithPath: "/b")),
+        ])
+        log.append(op)
+        let failure = RemovalFailure(trackID: 1, source: URL(fileURLWithPath: "/b"), message: "Gone")
+        log.markUndone(op.id, failures: [failure])
+        #expect(log.operations[0].undoFailures == [failure])
+
+        // An entry written before undo failures were logged.
+        let older = #"{"operations": [{"id": "\#(UUID().uuidString)", "date": "2026-09-29T12:00:00Z", "mode": {"moveToBin": {}}, "records": [], "failures": []}]}"#
+        let decoded = try RemovalLog.decoder.decode(RemovalLog.self, from: Data(older.utf8))
+        #expect(decoded.operations.first?.undoFailures == [])
     }
 
     @Test func logTracksLastUndoable() throws {

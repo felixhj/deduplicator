@@ -36,9 +36,19 @@ public struct SearchIndex: Sendable {
     public init() {}
 
     public init(tracks: some Sequence<Track>) {
+        add(tracks)
+    }
+
+    public mutating func add(_ tracks: some Sequence<Track>) {
         for track in tracks {
             let fields = [track.title, track.artist, track.album, track.albumArtist, track.url.path(percentEncoded: false)]
             text[track.id] = Self.fold(fields.joined(separator: "\n"))
+        }
+    }
+
+    public mutating func remove(_ ids: some Sequence<Track.ID>) {
+        for id in ids {
+            text[id] = nil
         }
     }
 

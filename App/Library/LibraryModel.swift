@@ -21,6 +21,8 @@ final class LibraryModel {
     let results: ResultsModel
     /// Plays copies from the results.
     let player: PlayerModel
+    /// Removes marked copies and undoes removals.
+    let removal: RemovalModel
     /// Set to show the folder picker, for example from the Add Folder command.
     var isChoosingFolders = false
 
@@ -30,13 +32,21 @@ final class LibraryModel {
     @ObservationIgnored private let cacheURL: URL?
     private static let foldersKey = "scanFolders"
 
-    /// `cacheURL` is where scans keep their cache, and `waveformFolder` where
-    /// the player keeps waveforms; nil turns either off.
-    init(defaults: UserDefaults = .standard, cacheURL: URL? = AppFolders.scanCache, waveformFolder: URL? = AppFolders.waveforms) {
+    /// `cacheURL` is where scans keep their cache, `waveformFolder` where the
+    /// player keeps waveforms and `removalLog` where removals are logged; nil
+    /// turns any of them off. `fileMover` moves removed files.
+    init(
+        defaults: UserDefaults = .standard,
+        cacheURL: URL? = AppFolders.scanCache,
+        waveformFolder: URL? = AppFolders.waveforms,
+        removalLog: URL? = AppFolders.removalLog,
+        fileMover: any FileMover = LocalFileMover()
+    ) {
         self.defaults = defaults
         self.cacheURL = cacheURL
         results = ResultsModel(defaults: defaults)
         player = PlayerModel(defaults: defaults, waveforms: waveformFolder.map { WaveformCache(folder: $0) })
+        removal = RemovalModel(results: results, player: player, logURL: removalLog, mover: fileMover)
         folders = (defaults.stringArray(forKey: Self.foldersKey) ?? [])
             .map { URL(filePath: $0, directoryHint: .isDirectory) }
     }
@@ -45,7 +55,24 @@ final class LibraryModel {
         if case .scanning = state { true } else { false }
     }
 
-    var canScan: Bool { !isScanning && !folders.isEmpty }
+    var canScan: Bool { !isScanning && !folders.isEmpty && !removal.isBusy && !isShowingSheet }
+
+    /// Removing waits for matching to settle, since it can drop marks.
+    var canRemove: Bool {
+        !isScanning && !removal.isBusy && !isShowingSheet && results.matchState == .finished && !results.marked.isEmpty
+    }
+
+    var canAutoSelect: Bool {
+        !isScanning && !removal.isBusy && !isShowingSheet && results.matchState == .finished && !results.shownGroups.isEmpty
+    }
+
+    var canUndoRemoval: Bool { removal.canUndo && !isScanning && !isShowingSheet }
+
+    /// Menu commands still work while a sheet is up, and a window shows one
+    /// sheet at a time, so commands that open one, or change what one shows, wait.
+    var isShowingSheet: Bool {
+        removal.isConfirmingRemoval || removal.isUndoing || results.isAutoSelecting
+    }
 
     /// Adds folders that aren't in the list yet, including repeats within `urls`.
     func addFolders(_ urls: [URL]) {

@@ -177,6 +177,15 @@ struct GroupArrangementTests {
         #expect(arrange(ResultFilter(text: "nothing like this")).isEmpty)
     }
 
+    @Test func searchIndexAddsAndRemovesTracks() {
+        var index = SearchIndex(tracks: [tracks[0]!])
+        index.add([tracks[2]!])
+        #expect(index.track(2, contains: "strings"))
+        index.remove([0])
+        #expect(!index.track(0, contains: "cafe"))
+        #expect(index.track(2, contains: "strings"))
+    }
+
     @Test func searchIndexFoldsCaseAndAccents() {
         let index = SearchIndex(tracks: tracks.values)
         #expect(index.track(0, contains: SearchIndex.fold("CAFÉ del")))
