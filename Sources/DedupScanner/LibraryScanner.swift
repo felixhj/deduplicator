@@ -30,6 +30,12 @@ public struct ScanResult: Sendable {
     public var issues: [ScanIssue]
     /// Tracks taken from the cache instead of being read.
     public var cachedCount: Int
+
+    public init(tracks: [Track], issues: [ScanIssue] = [], cachedCount: Int = 0) {
+        self.tracks = tracks
+        self.issues = issues
+        self.cachedCount = cachedCount
+    }
 }
 
 /// Finds audio files under folders and reads them into tracks, several at a
