@@ -17,6 +17,12 @@ public enum KeeperRule: Sendable, Hashable, Codable {
     case pathDoesNotContain(String)
     case preferFormat(AudioFormat)
 
+    /// The rules that need no text or format, which a list of rules has at most once.
+    public static let plainRules: [KeeperRule] = [
+        .preferLossless, .higherBitrate, .higherSampleRate, .higherBitDepth, .longerDuration,
+        .moreTagsFilled, .largerFile, .olderFile, .newerFile,
+    ]
+
     public var description: String {
         switch self {
         case .preferLossless: "Prefer lossless"
@@ -112,16 +118,30 @@ public struct KeeperSelector: Sendable, Hashable, Codable {
         return false
     }
 
+    /// The keeper of each group, and the copies it beats.
+    public func choices(for groups: [DuplicateGroup], tracks: [Track.ID: Track]) -> [KeeperChoice] {
+        groups.compactMap { group in
+            let members = group.trackIDs.compactMap { tracks[$0] }
+            guard let keep = keeper(among: members) else { return nil }
+            return KeeperChoice(groupID: group.id, keeper: keep.id, others: members.map(\.id).filter { $0 != keep.id })
+        }
+    }
+
     /// IDs to remove across all groups: every member except each group's keeper.
     public func autoSelect(groups: [DuplicateGroup], tracks: [Track.ID: Track]) -> Set<Track.ID> {
-        var selected: Set<Track.ID> = []
-        for group in groups {
-            let members = group.trackIDs.compactMap { tracks[$0] }
-            guard let keep = keeper(among: members) else { continue }
-            for track in members where track.id != keep.id {
-                selected.insert(track.id)
-            }
-        }
-        return selected
+        Set(choices(for: groups, tracks: tracks).flatMap(\.others))
+    }
+}
+
+/// The copy auto-select keeps in a group, and the others, which it marks.
+public struct KeeperChoice: Sendable, Hashable {
+    public var groupID: DuplicateGroup.ID
+    public var keeper: Track.ID
+    public var others: [Track.ID]
+
+    public init(groupID: DuplicateGroup.ID, keeper: Track.ID, others: [Track.ID]) {
+        self.groupID = groupID
+        self.keeper = keeper
+        self.others = others
     }
 }

@@ -17,9 +17,13 @@ public struct RemovalLog: Sendable, Hashable, Codable {
         operations.append(operation)
     }
 
-    public mutating func markUndone(_ id: RemovalOperation.ID, at date: Date = Date()) {
+    /// Records the undo, with the files it couldn't put back. An operation is
+    /// undone once, even if some files failed: they're usually gone for good,
+    /// as when the Bin has been emptied, and the log says where they were.
+    public mutating func markUndone(_ id: RemovalOperation.ID, at date: Date = Date(), failures: [RemovalFailure] = []) {
         guard let index = operations.firstIndex(where: { $0.id == id }) else { return }
         operations[index].undoneAt = date
+        operations[index].undoFailures = failures
     }
 
     public static func load(from url: URL) throws -> RemovalLog {
