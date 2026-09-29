@@ -17,8 +17,8 @@ final class TextCellView: NSTableCellView {
         addSubview(label)
         textField = label
         NSLayoutConstraint.activate([
-            label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 4),
-            label.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -4),
+            label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Self.margin),
+            label.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Self.margin),
             label.centerYAnchor.constraint(equalTo: centerYAnchor),
         ])
     }
@@ -27,10 +27,26 @@ final class TextCellView: NSTableCellView {
         fatalError("init(coder:) has not been implemented")
     }
 
+    /// Margins either side of the label, as its constraints set them.
+    static let margin: CGFloat = 4
+
+    static func font(isNumeric: Bool) -> NSFont {
+        isNumeric ? .monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular) : .systemFont(ofSize: NSFont.systemFontSize)
+    }
+
+    /// The label's own padding around its text, measured once.
+    private static let labelPadding = NSTextField(labelWithString: "").intrinsicContentSize.width
+
+    /// The narrowest a cell can be and still show all of `text`.
+    static func width(fitting text: String, isNumeric: Bool) -> CGFloat {
+        let textWidth = (text as NSString).size(withAttributes: [.font: font(isNumeric: isNumeric)]).width
+        return textWidth.rounded(.up) + labelPadding + margin * 2
+    }
+
     func configure(text: String, isNumeric: Bool, differs: Bool) {
         label.stringValue = text
         label.alignment = isNumeric ? .right : .left
-        label.font = isNumeric ? .monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular) : .systemFont(ofSize: NSFont.systemFontSize)
+        label.font = Self.font(isNumeric: isNumeric)
         label.toolTip = text.isEmpty ? nil : text
         if differs != self.differs {
             self.differs = differs
@@ -214,7 +230,9 @@ final class GroupHeaderView: NSTableCellView {
 
         let spacer = NSView()
         spacer.setContentHuggingPriority(.init(1), for: .horizontal)
-        let stack = NSStackView(views: [disclosure, titleLabel, detailLabel, spacer, warning])
+        // The warning follows the title: the row is as wide as every column,
+        // so anything at its far end is usually scrolled out of view.
+        let stack = NSStackView(views: [disclosure, titleLabel, warning, detailLabel, spacer])
         stack.orientation = .horizontal
         stack.alignment = .centerY
         stack.spacing = 8

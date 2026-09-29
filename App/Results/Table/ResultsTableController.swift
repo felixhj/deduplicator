@@ -22,6 +22,7 @@ final class ResultsTableController: NSObject {
     private var appliedRevision = -1
     private var appliedMarksRevision = -1
     private var appliedNowPlaying: NowPlaying?
+    private var appliedReveal: RevealRequest?
     /// Groups the user collapsed, by `GroupItem.key`. Everything else is expanded.
     private var collapsedGroups: Set<Track.ID> = []
     /// True while the controller changes the table itself, so delegate
@@ -109,6 +110,22 @@ final class ResultsTableController: NSObject {
             appliedNowPlaying = player.nowPlaying
             refreshPlayCells()
         }
+        if let request = model.revealRequest, request != appliedReveal {
+            appliedReveal = request
+            reveal(request.trackID)
+        }
+    }
+
+    /// Selects a copy and scrolls to it, expanding its group. A copy in a
+    /// group the filter hides can't be shown.
+    private func reveal(_ trackID: Track.ID) {
+        guard let group = items.first(where: { $0.copies.contains { $0.track.id == trackID } }) else { return }
+        setExpanded(group, true)
+        guard let header = row(of: group), let copy = group.copies.firstIndex(where: { $0.track.id == trackID }) else { return }
+        tableView.selectRowIndexes([header + 1 + copy], byExtendingSelection: false)
+        tableView.scrollRowToVisible(header)
+        tableView.scrollRowToVisible(header + 1 + copy)
+        tableView.window?.makeFirstResponder(tableView)
     }
 
     private func reload() {
@@ -200,7 +217,8 @@ final class ResultsTableController: NSObject {
         let tableColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(column.id))
         tableColumn.title = column.title
         tableColumn.headerToolTip = column.name
-        tableColumn.headerCell.alignment = column.isNumeric ? .right : .left
+        // Numbers are right-aligned in their cells, but every heading is left-aligned.
+        tableColumn.headerCell.alignment = .left
         tableColumn.width = model.columnWidths[column.id].map { CGFloat($0) } ?? Self.defaultWidth(of: column)
         tableColumn.minWidth = 24
         tableColumn.maxWidth = 4000
@@ -553,8 +571,23 @@ extension ResultsTableController: NSTableViewDelegate {
         }
     }
 
+    /// AppKit asks with `newColumnIndex` -1 as a drag starts, meaning "can this
+    /// column be dragged at all?"
     func tableView(_ tableView: NSTableView, shouldReorderColumn columnIndex: Int, toColumn newColumnIndex: Int) -> Bool {
-        columnIndex >= Self.fixedColumnCount && newColumnIndex >= Self.fixedColumnCount
+        columnIndex >= Self.fixedColumnCount && (newColumnIndex == -1 || newColumnIndex >= Self.fixedColumnCount)
+    }
+
+    /// Double-clicking a heading's divider fits the column to its widest value
+    /// in the groups shown, collapsed ones included, or to its title if that's wider.
+    func tableView(_ tableView: NSTableView, sizeToFitWidthOfColumn column: Int) -> CGFloat {
+        let tableColumn = tableView.tableColumns[column]
+        guard let trackColumn = columnsByID[tableColumn.identifier.rawValue] else { return tableColumn.width }
+        // Many values repeat, such as album names, so each is measured once.
+        let texts = Set(items.lazy.flatMap(\.copies).map { trackColumn.text(for: $0.track) })
+        let widest = texts.reduce(tableColumn.headerCell.cellSize.width) { widest, text in
+            max(widest, TextCellView.width(fitting: text, isNumeric: trackColumn.isNumeric))
+        }
+        return min(max(widest.rounded(.up), tableColumn.minWidth), tableColumn.maxWidth)
     }
 
     func tableViewColumnDidMove(_ notification: Notification) {

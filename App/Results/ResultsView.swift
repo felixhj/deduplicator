@@ -19,7 +19,8 @@ struct ResultsView: View {
                 marksRevision: results.marksRevision,
                 columns: results.columns,
                 order: results.order,
-                nowPlaying: library.player.nowPlaying
+                nowPlaying: library.player.nowPlaying,
+                revealRequest: results.revealRequest
             )
             .overlay { EmptyResultsView(showsSettings: $showsSettings) }
             Divider()
@@ -176,6 +177,7 @@ private struct ResultsStatusBar: View {
                 }
             }
             if !results.marked.isEmpty {
+                EveryCopyMarkedWarning(results: results)
                 Text("\(results.marked.count.formatted()) marked for removal (\(TrackColumn.formatSize(results.markedSize)))")
             }
             Button("Scan Report") { showsReport = true }
@@ -204,5 +206,29 @@ private struct ResultsStatusBar: View {
 
     private func plural(_ count: Int, _ one: String, _ many: String) -> String {
         "\(count.formatted()) \(count == 1 ? one : many)"
+    }
+}
+
+/// Says when every copy of a track is marked, so a removal would leave none,
+/// with a link to the first such group the filter shows.
+private struct EveryCopyMarkedWarning: View {
+    let results: ResultsModel
+
+    var body: some View {
+        let groups = results.groupsWithEveryCopyMarked
+        if !groups.isEmpty {
+            HStack(spacing: 4) {
+                Label(
+                    groups.count == 1 ? "Every copy is marked in 1 group" : "Every copy is marked in \(groups.count.formatted()) groups",
+                    systemImage: "exclamationmark.triangle.fill"
+                )
+                .foregroundStyle(.orange)
+                let shown = Set(results.shownGroups.map(\.id))
+                if let first = groups.first(where: { shown.contains($0.id) }), let copy = first.trackIDs.first {
+                    Button("Show") { results.reveal(copy) }
+                        .buttonStyle(.link)
+                }
+            }
+        }
     }
 }

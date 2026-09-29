@@ -233,4 +233,20 @@ struct ResultsModelTests {
         #expect(PresetChoice(matching: loose, saved: SavedPreset.list([], saving: loose, as: "Nine")) == .saved("Nine"))
         #expect(PresetChoice(matching: loose, saved: []) == .custom)
     }
+
+    @Test func groupsWithEveryCopyMarkedAreFound() async throws {
+        let model = try await loadedModel()
+        #expect(model.groupsWithEveryCopyMarked.isEmpty)
+        model.setMarked([3, 4, 0], true)
+        #expect(model.groupsWithEveryCopyMarked.map(\.trackIDs) == [[3, 4]])
+        model.reveal(4)
+        #expect(model.revealRequest?.trackID == 4)
+    }
+
+    @Test func theEveryCopyCalloutListsTracksBriefly() {
+        #expect(EveryCopyCallout.list(["A"]) == "“A”")
+        #expect(EveryCopyCallout.list(["A", "B"]) == "“A” and “B”")
+        #expect(EveryCopyCallout.list(["A", "B", "C"]) == "“A”, “B” and “C”")
+        #expect(EveryCopyCallout.list(["A", "B", "C", "D", "E"]) == "“A”, “B”, “C” and 2 more")
+    }
 }

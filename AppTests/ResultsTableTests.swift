@@ -69,6 +69,64 @@ struct ResultsTableTests {
         #expect(!table.tableView(tableView, shouldReorderColumn: 3, toColumn: 1))
         #expect(!table.tableView(tableView, shouldReorderColumn: 0, toColumn: 2))
         #expect(table.tableView(tableView, shouldReorderColumn: 3, toColumn: 2))
+        // AppKit asks with -1 as a drag starts.
+        #expect(table.tableView(tableView, shouldReorderColumn: 3, toColumn: -1), "Other columns can be dragged")
+        #expect(!table.tableView(tableView, shouldReorderColumn: 1, toColumn: -1), "The ▶ column can't")
+    }
+
+    @Test func everyHeadingIsLeftAligned() async throws {
+        let (_, table) = try await makeTable()
+        let bitrate = try #require(table.tableView.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier("bitrate")))
+        #expect(bitrate.headerCell.alignment == .left)
+    }
+
+    @Test func doubleClickingADividerFitsTheColumnToItsWidestValue() async throws {
+        let (model, table) = try await makeTable()
+        let tableView = table.tableView
+        let shown = model.shownGroups.flatMap(\.trackIDs).compactMap { model.tracks[$0] }
+        // The widest as drawn, which in a proportional font needn't be the longest.
+        let longest = try #require(shown.map { $0.url.path(percentEncoded: false) }.max {
+            TextCellView.width(fitting: $0, isNumeric: false) < TextCellView.width(fitting: $1, isNumeric: false)
+        })
+        let path = tableView.column(withIdentifier: NSUserInterfaceItemIdentifier("path"))
+        let fitted = table.tableView(tableView, sizeToFitWidthOfColumn: path)
+        #expect(fitted < TrackColumnWidths.path, "Narrower than the default for these short paths")
+
+        // At that width, a cell shows all of the longest path, with little to spare.
+        let cell = TextCellView()
+        cell.configure(text: longest, isNumeric: false, differs: false)
+        cell.frame = NSRect(x: 0, y: 0, width: fitted, height: 20)
+        cell.layoutSubtreeIfNeeded()
+        // Constraints and intrinsic sizes both work on the label's alignment
+        // rect, which AppKit insets from its frame.
+        let label = try #require(cell.textField)
+        let shownWidth = label.alignmentRect(forFrame: label.frame).width
+        #expect(shownWidth >= label.intrinsicContentSize.width)
+        #expect(shownWidth - label.intrinsicContentSize.width <= 2)
+
+        let number = tableView.column(withIdentifier: NSUserInterfaceItemIdentifier("trackNumber"))
+        #expect(table.tableView(tableView, sizeToFitWidthOfColumn: number) >= tableView.tableColumns[number].headerCell.cellSize.width, "Never narrower than the heading")
+    }
+
+    @Test func theEveryCopyWarningSitsByTheTitle() async throws {
+        let (model, table) = try await makeTable()
+        let window = realise(table)
+        defer { window.close() }
+        model.setMarked([3, 4], true)
+        table.update()
+        let header = try #require(table.tableView.view(atColumn: 0, row: 4, makeIfNecessary: false) as? GroupHeaderView)
+        #expect(header.everyCopyMarked)
+        let stack = try #require(header.subviews.first as? NSStackView)
+        #expect(stack.arrangedSubviews.firstIndex { $0 is NSStackView } == 2, "Straight after the title, not at the row's far end")
+    }
+
+    @Test func revealingACopyExpandsSelectsAndShowsIt() async throws {
+        let (model, table) = try await makeTable()
+        table.setExpanded(try #require(table.item(atRow: 4) as? GroupItem), false)
+        model.reveal(4)
+        table.update()
+        #expect(table.selectedTrackIDs == [4])
+        #expect(table.tableView.numberOfRows == 7, "Its group was expanded")
     }
 
     @Test func clickingAHeaderOrdersByThatColumn() async throws {
@@ -347,4 +405,9 @@ extension ResultsTableTests {
         #expect(player.position == 0, "Another track starts from the top")
         player.pause()
     }
+}
+
+/// The default widths the table gives columns, for comparing with fitted ones.
+enum TrackColumnWidths {
+    @MainActor static let path = ResultsTableController.defaultWidth(of: .path)
 }

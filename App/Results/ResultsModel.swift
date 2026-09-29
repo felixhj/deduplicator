@@ -88,6 +88,9 @@ final class ResultsModel {
     /// Goes up to move the keyboard focus to the filter, as Find does.
     var filterFocusRequests = 0
 
+    /// The copy the table should show next, from `reveal`.
+    private(set) var revealRequest: RevealRequest?
+
     @ObservationIgnored private var trackList: [Track] = []
     @ObservationIgnored private var searchIndex = SearchIndex()
     @ObservationIgnored private var matchTask: Task<Void, Never>?
@@ -187,6 +190,16 @@ final class ResultsModel {
 
     func isEveryCopyMarked(in group: DuplicateGroup) -> Bool {
         group.trackIDs.allSatisfy(marked.contains)
+    }
+
+    /// Groups where every copy is marked, so removing them leaves none of the track.
+    var groupsWithEveryCopyMarked: [DuplicateGroup] {
+        marked.isEmpty ? [] : groups.filter(isEveryCopyMarked)
+    }
+
+    /// Asks the table to select and show a copy, expanding its group.
+    func reveal(_ trackID: Track.ID) {
+        revealRequest = RevealRequest(trackID: trackID)
     }
 
     var markedSize: Int64 {
@@ -289,6 +302,13 @@ final class ResultsModel {
         columns = TrackColumn.defaults
         columnWidths = [:]
     }
+}
+
+/// A copy for the table to select and scroll to. Each request is new, so
+/// asking twice for the same copy shows it twice.
+struct RevealRequest: Equatable {
+    let id = UUID()
+    let trackID: Track.ID
 }
 
 /// Which copy to copy tags from, for the Copy Tags sheet.

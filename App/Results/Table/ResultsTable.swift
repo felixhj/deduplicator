@@ -12,6 +12,7 @@ struct ResultsTable: NSViewRepresentable {
     let columns: [TrackColumn]
     let order: GroupOrder
     let nowPlaying: NowPlaying
+    let revealRequest: RevealRequest?
 
     func makeCoordinator() -> ResultsTableController {
         ResultsTableController(model: model, player: player)

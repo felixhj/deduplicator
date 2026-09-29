@@ -9,6 +9,8 @@ struct RemoveSheet: View {
     @AppStorage(RemovalDestination.key) private var destination: RemovalDestination = .bin
     @AppStorage(RemovalDestination.folderKey) private var folderPath = ""
     @State private var report: RemovalModel.Report?
+    /// Removing every copy of a track needs saying yes to.
+    @State private var removesEveryCopy = false
 
     var body: some View {
         let removal = library.removal
@@ -32,7 +34,7 @@ struct RemoveSheet: View {
         let mode = destination.mode(folderPath: folderPath)
         let plan = mode.map { RemovalPlanner.plan(tracks, mode: $0) } ?? []
         let intoScanned = RemovalPlanner.moveIntoFolders(library.folders, in: plan)
-        let everyCopy = results.groups.count(where: results.isEveryCopyMarked)
+        let everyCopy = results.groupsWithEveryCopyMarked
         let shown = Set(results.shownGroups.flatMap(\.trackIDs))
         let hidden = tracks.count { !shown.contains($0.id) }
 
@@ -45,10 +47,8 @@ struct RemoveSheet: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            if everyCopy > 0 {
-                RemovalWarning(text: everyCopy == 1
-                    ? "Every copy is marked in one group, so none of that track will be left."
-                    : "Every copy is marked in \(everyCopy.formatted()) groups, so none of those tracks will be left.")
+            if !everyCopy.isEmpty {
+                EveryCopyCallout(names: everyCopy.compactMap { $0.trackIDs.first.flatMap { results.tracks[$0]?.displayName } }, isConfirmed: $removesEveryCopy)
             }
             if hidden > 0 {
                 RemovalWarning(text: hidden == 1
@@ -109,7 +109,7 @@ struct RemoveSheet: View {
                     if let mode { start(mode) }
                 }
                 .keyboardShortcut(.defaultAction)
-                .disabled(tracks.isEmpty || mode == nil || intoScanned != nil)
+                .disabled(tracks.isEmpty || mode == nil || intoScanned != nil || (!everyCopy.isEmpty && !removesEveryCopy))
             }
         }
     }
@@ -123,5 +123,39 @@ struct RemoveSheet: View {
                 self.report = report
             }
         }
+    }
+}
+
+/// Names the tracks that would have no copy left, and asks for a tick before
+/// they can be removed.
+struct EveryCopyCallout: View {
+    let names: [String]
+    @Binding var isConfirmed: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label {
+                Text(names.count == 1 ? "No copy of 1 track will be left" : "No copy of \(names.count.formatted()) tracks will be left")
+                    .fontWeight(.semibold)
+            } icon: {
+                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+            }
+            Text("Every copy of \(Self.list(names)) is marked.")
+                .fixedSize(horizontal: false, vertical: true)
+            Toggle(names.count == 1 ? "Remove every copy of this track" : "Remove every copy of these tracks", isOn: $isConfirmed)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.orange.opacity(0.12), in: .rect(cornerRadius: 8))
+        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.orange.opacity(0.5)))
+    }
+
+    /// "A", "A and B", "A, B and C", or "A, B, C and 4 more".
+    static func list(_ names: [String]) -> String {
+        let shown = names.prefix(3).map { "“\($0)”" }
+        let rest = names.count - shown.count
+        if rest > 0 { return shown.joined(separator: ", ") + " and \(rest.formatted()) more" }
+        guard shown.count > 1 else { return shown.first ?? "" }
+        return shown.dropLast().joined(separator: ", ") + " and " + shown.last!
     }
 }
