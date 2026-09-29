@@ -274,7 +274,7 @@ final class FakeFileMover: FileMover, @unchecked Sendable {
 
         // An entry written before undo failures were logged.
         let older = #"{"operations": [{"id": "\#(UUID().uuidString)", "date": "2026-09-29T12:00:00Z", "mode": {"moveToBin": {}}, "records": [], "failures": []}]}"#
-        let decoded = try RemovalLog.decoder.decode(RemovalLog.self, from: Data(older.utf8))
+        let decoded = try LogFile.decoder.decode(RemovalLog.self, from: Data(older.utf8))
         #expect(decoded.operations.first?.undoFailures == [])
     }
 

@@ -88,6 +88,24 @@ struct AudioFileReaderTests {
         }
     }
 
+    @Test func rereadingPicksUpNewTagsAndKeepsTheID() async throws {
+        try await withTemporaryFolder { folder in
+            let url = folder.appending(path: "a.wav")
+            try AudioFixtures.writeWAV(to: url, seconds: 0.5)
+            var track = AudioFileReader().read(try discovered(url, in: folder)).track
+            track.id = 7
+            try TagLibFile.write(["TITLE": ["Strings of Life"], "COMMENT": ["Ripped"]], to: url)
+
+            let reread = AudioFileReader().reread(track).track
+            #expect(reread.id == 7)
+            #expect(reread.scanRoot == track.scanRoot)
+            #expect(reread.title == "Strings of Life")
+            #expect(reread.tags["COMMENT"] == "Ripped")
+            #expect(reread.fileSize > track.fileSize)
+            #expect(abs((reread.duration ?? 0) - 0.5) < 0.01)
+        }
+    }
+
     @Test func unreadableFileStillBecomesATrack() async throws {
         try await withTemporaryFolder { folder in
             let url = try folder.appending(path: "Artist - Title.flac").create("not audio")
