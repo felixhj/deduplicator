@@ -6,4 +6,8 @@ enum AppFolders {
     static let support = URL.applicationSupportDirectory.appending(path: "Deduplicator", directoryHint: .isDirectory)
 
     static let scanCache = support.appending(path: "ScanCache.json")
+
+    /// ~/Library/Caches/Deduplicator/Waveforms. The system may empty it, which
+    /// only means waveforms are drawn again.
+    static let waveforms = URL.cachesDirectory.appending(path: "Deduplicator/Waveforms", directoryHint: .isDirectory)
 }

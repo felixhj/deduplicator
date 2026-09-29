@@ -2,7 +2,8 @@ import AppKit
 import DedupCore
 
 /// Runs the results table: its rows, columns, sorting, collapsed groups,
-/// marks and keyboard shortcuts. `ResultsTable` puts it into SwiftUI.
+/// marks and keyboard shortcuts, and which copy is in the player.
+/// `ResultsTable` puts it into SwiftUI.
 ///
 /// The table is flat: each group is a full-width header row followed by a row
 /// per copy. Collapsing a group removes its copy rows. This is much faster
@@ -10,6 +11,7 @@ import DedupCore
 @MainActor
 final class ResultsTableController: NSObject {
     let model: ResultsModel
+    let player: PlayerModel
     let tableView = ResultsTableView()
     let scrollView = NSScrollView()
 
@@ -19,6 +21,7 @@ final class ResultsTableController: NSObject {
     private var columnsByID: [String: TrackColumn] = [:]
     private var appliedRevision = -1
     private var appliedMarksRevision = -1
+    private var appliedNowPlaying: NowPlaying?
     /// Groups the user collapsed, by `GroupItem.key`. Everything else is expanded.
     private var collapsedGroups: Set<Track.ID> = []
     /// True while the controller changes the table itself, so delegate
@@ -26,10 +29,14 @@ final class ResultsTableController: NSObject {
     private var isSyncing = false
 
     static let markColumnID = NSUserInterfaceItemIdentifier("mark")
+    static let playColumnID = NSUserInterfaceItemIdentifier("play")
+    /// The tick box and ▶ columns come first and stay there.
+    static let fixedColumnCount = 2
     static let headerHeight: CGFloat = 26
 
-    init(model: ResultsModel) {
+    init(model: ResultsModel, player: PlayerModel) {
         self.model = model
+        self.player = player
         super.init()
         configure()
     }
@@ -51,18 +58,24 @@ final class ResultsTableController: NSObject {
         tableView.floatsGroupRows = true
         tableView.keyHandler = { [weak self] event in self?.handleKey(event) ?? false }
         tableView.canSelectRow = { [weak self] row in self?.item(atRow: row) is CopyItem }
+        tableView.hoverHandler = { [weak self] old, new in self?.hoverMoved(from: old, to: new) }
+        tableView.target = self
+        tableView.doubleAction = #selector(playClickedRow)
         tableView.menu = makeRowMenu()
         tableView.setAccessibilityLabel("Duplicate groups")
 
-        let markColumn = NSTableColumn(identifier: Self.markColumnID)
-        markColumn.title = "✓"
-        markColumn.headerToolTip = "Marked for removal"
-        markColumn.headerCell.alignment = .center
-        markColumn.width = 24
-        markColumn.minWidth = 24
-        markColumn.maxWidth = 24
-        markColumn.resizingMask = []
-        tableView.addTableColumn(markColumn)
+        // U+FE0E asks for the text triangle rather than the emoji.
+        for (identifier, title, toolTip) in [(Self.markColumnID, "✓", "Marked for removal"), (Self.playColumnID, "\u{25B6}\u{FE0E}", "Play")] {
+            let column = NSTableColumn(identifier: identifier)
+            column.title = title
+            column.headerToolTip = toolTip
+            column.headerCell.alignment = .center
+            column.width = 24
+            column.minWidth = 24
+            column.maxWidth = 24
+            column.resizingMask = []
+            tableView.addTableColumn(column)
+        }
 
         let headerMenu = NSMenu()
         headerMenu.delegate = self
@@ -72,6 +85,9 @@ final class ResultsTableController: NSObject {
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = true
         scrollView.autohidesScrollers = true
+        // Scrolling moves rows under a pointer that stays still.
+        scrollView.contentView.postsBoundsChangedNotifications = true
+        NotificationCenter.default.addObserver(self, selector: #selector(scrolled), name: NSView.boundsDidChangeNotification, object: scrollView.contentView)
     }
 
     // MARK: - Updates from the model
@@ -86,6 +102,10 @@ final class ResultsTableController: NSObject {
         } else if model.marksRevision != appliedMarksRevision {
             appliedMarksRevision = model.marksRevision
             refreshMarks()
+        }
+        if player.nowPlaying != appliedNowPlaying {
+            appliedNowPlaying = player.nowPlaying
+            refreshPlayCells()
         }
     }
 
@@ -110,6 +130,7 @@ final class ResultsTableController: NSObject {
         if stillSelected != model.selection {
             Task { @MainActor [weak self] in self?.model.selection = stillSelected }
         }
+        tableView.updateHover()
     }
 
     func item(atRow row: Int) -> AnyObject? {
@@ -136,6 +157,17 @@ final class ResultsTableController: NSObject {
         }
     }
 
+    /// Updates the ▶ column in the rows on screen.
+    private func refreshPlayCells() {
+        let playColumn = tableView.column(withIdentifier: Self.playColumnID)
+        let nowPlaying = player.nowPlaying
+        tableView.enumerateAvailableRowViews { rowView, row in
+            guard let copy = item(atRow: row) as? CopyItem else { return }
+            (rowView.view(atColumn: playColumn) as? PlayCellView)?
+                .update(isCurrent: copy.track.id == nowPlaying.trackID, isPlaying: nowPlaying.isPlaying)
+        }
+    }
+
     /// Adds, removes and reorders table columns to match `model.columns`.
     private func syncColumns() {
         let wanted = model.columns
@@ -143,7 +175,7 @@ final class ResultsTableController: NSObject {
         isSyncing = true
         defer { isSyncing = false }
         for tableColumn in tableView.tableColumns
-        where tableColumn.identifier != Self.markColumnID && columnsByID[tableColumn.identifier.rawValue] == nil {
+        where !Self.isFixed(tableColumn) && columnsByID[tableColumn.identifier.rawValue] == nil {
             tableView.removeTableColumn(tableColumn)
         }
         for (offset, column) in wanted.enumerated() {
@@ -152,10 +184,14 @@ final class ResultsTableController: NSObject {
                 tableView.addTableColumn(makeTableColumn(column))
             }
             let current = tableView.column(withIdentifier: identifier)
-            if current != offset + 1 {
-                tableView.moveColumn(current, toColumn: offset + 1)
+            if current != offset + Self.fixedColumnCount {
+                tableView.moveColumn(current, toColumn: offset + Self.fixedColumnCount)
             }
         }
+    }
+
+    static func isFixed(_ tableColumn: NSTableColumn) -> Bool {
+        tableColumn.identifier == markColumnID || tableColumn.identifier == playColumnID
     }
 
     private func makeTableColumn(_ column: TrackColumn) -> NSTableColumn {
@@ -222,6 +258,7 @@ final class ResultsTableController: NSObject {
         }
         guard modifiers.isEmpty else { return false }
         switch event.charactersIgnoringModifiers?.lowercased() {
+        case " ": togglePlayback(); return true
         case "d": markSelection(true); return true
         case "k": markSelection(false); return true
         default: return false
@@ -248,6 +285,56 @@ final class ResultsTableController: NSObject {
         tableView.scrollRowToVisible(header + 1)
     }
 
+    // MARK: - Playing
+
+    /// A copy selected on its own goes into the player. Several selected
+    /// copies don't, so selecting copies to mark them doesn't interrupt the
+    /// one playing.
+    private func followSelection() {
+        let selected = tableView.selectedRowIndexes
+        guard selected.count == 1, let copy = selected.first.flatMap(item(atRow:)) as? CopyItem else { return }
+        player.select(copy.track, copies: copy.group.copies.map(\.track))
+    }
+
+    private func play(_ copy: CopyItem) {
+        player.play(copy.track, copies: copy.group.copies.map(\.track))
+    }
+
+    /// Space plays or pauses. With nothing in the player, it plays the first selected copy.
+    private func togglePlayback() {
+        if player.track == nil, let copy = tableView.selectedRowIndexes.first.flatMap(item(atRow:)) as? CopyItem {
+            play(copy)
+        } else {
+            player.togglePlayback()
+        }
+    }
+
+    /// The ▶ button pauses or resumes the copy in the player, and selects and
+    /// plays any other copy.
+    private func playButtonClicked(_ id: Track.ID) {
+        if player.track?.id == id { return player.togglePlayback() }
+        guard let row = rows.firstIndex(where: { ($0 as? CopyItem)?.track.id == id }), let copy = rows[row] as? CopyItem else { return }
+        tableView.selectRowIndexes([row], byExtendingSelection: false)
+        play(copy)
+    }
+
+    @objc private func playClickedRow() {
+        guard let copy = item(atRow: tableView.clickedRow) as? CopyItem else { return }
+        play(copy)
+    }
+
+    /// Shows the ▶ button on the row under the pointer only.
+    private func hoverMoved(from old: Int, to new: Int) {
+        let playColumn = tableView.column(withIdentifier: Self.playColumnID)
+        for (row, isHovered) in [(old, false), (new, true)] where rows.indices.contains(row) {
+            (tableView.view(atColumn: playColumn, row: row, makeIfNecessary: false) as? PlayCellView)?.isHovered = isHovered
+        }
+    }
+
+    @objc private func scrolled() {
+        tableView.updateHover()
+    }
+
     // MARK: - Expanding and collapsing
 
     func isExpanded(_ group: GroupItem) -> Bool {
@@ -263,6 +350,7 @@ final class ResultsTableController: NSObject {
             tableView.reloadData()
             let selectedRows = rows.indices.filter { selected.contains((rows[$0] as? CopyItem)?.track.id ?? -1) }
             tableView.selectRowIndexes(IndexSet(selectedRows), byExtendingSelection: false)
+            tableView.updateHover()
         } else {
             setExpanded(group, expand)
         }
@@ -282,6 +370,7 @@ final class ResultsTableController: NSObject {
             tableView.removeRows(at: copyRows, withAnimation: [])
         }
         (tableView.view(atColumn: 0, row: header, makeIfNecessary: false) as? GroupHeaderView)?.isExpanded = expand
+        tableView.updateHover()
     }
 
     // MARK: - Menus
@@ -429,6 +518,14 @@ extension ResultsTableController: NSTableViewDelegate {
                 }
                 return view
             }
+            if identifier == Self.playColumnID {
+                let view = tableView.makeView(withIdentifier: PlayCellView.identifier, owner: self) as? PlayCellView ?? PlayCellView()
+                let id = copy.track.id
+                view.configure(isCurrent: player.track?.id == id, isPlaying: player.isPlaying, isHovered: row == self.tableView.hoveredRow) { [weak self] in
+                    self?.playButtonClicked(id)
+                }
+                return view
+            }
             guard let column = columnsByID[identifier.rawValue] else { return nil }
             let view = tableView.makeView(withIdentifier: TextCellView.identifier, owner: self) as? TextCellView ?? TextCellView()
             view.configure(
@@ -443,7 +540,7 @@ extension ResultsTableController: NSTableViewDelegate {
     }
 
     func tableView(_ tableView: NSTableView, shouldReorderColumn columnIndex: Int, toColumn newColumnIndex: Int) -> Bool {
-        columnIndex != 0 && newColumnIndex != 0
+        columnIndex >= Self.fixedColumnCount && newColumnIndex >= Self.fixedColumnCount
     }
 
     func tableViewColumnDidMove(_ notification: Notification) {
@@ -453,7 +550,7 @@ extension ResultsTableController: NSTableViewDelegate {
 
     func tableViewColumnDidResize(_ notification: Notification) {
         guard !isSyncing, let tableColumn = notification.userInfo?["NSTableColumn"] as? NSTableColumn,
-              tableColumn.identifier != Self.markColumnID
+              !Self.isFixed(tableColumn)
         else { return }
         model.columnWidths[tableColumn.identifier.rawValue] = Double(tableColumn.width)
     }
@@ -461,5 +558,6 @@ extension ResultsTableController: NSTableViewDelegate {
     func tableViewSelectionDidChange(_ notification: Notification) {
         guard !isSyncing else { return }
         model.selection = selectedTrackIDs
+        followSelection()
     }
 }

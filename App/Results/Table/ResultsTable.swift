@@ -6,13 +6,15 @@ import SwiftUI
 /// calls `updateNSView` when they change; the controller reads the model itself.
 struct ResultsTable: NSViewRepresentable {
     let model: ResultsModel
+    let player: PlayerModel
     let revision: Int
     let marksRevision: Int
     let columns: [TrackColumn]
     let order: GroupOrder
+    let nowPlaying: NowPlaying
 
     func makeCoordinator() -> ResultsTableController {
-        ResultsTableController(model: model)
+        ResultsTableController(model: model, player: player)
     }
 
     func makeNSView(context: Context) -> NSScrollView {

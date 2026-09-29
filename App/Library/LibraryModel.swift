@@ -19,6 +19,8 @@ final class LibraryModel {
     private(set) var issues: [ScanIssue] = []
     /// Duplicates among the tracks from the last scan.
     let results: ResultsModel
+    /// Plays copies from the results.
+    let player: PlayerModel
     /// Set to show the folder picker, for example from the Add Folder command.
     var isChoosingFolders = false
 
@@ -28,11 +30,13 @@ final class LibraryModel {
     @ObservationIgnored private let cacheURL: URL?
     private static let foldersKey = "scanFolders"
 
-    /// `cacheURL` is where scans keep their cache; nil turns the cache off.
-    init(defaults: UserDefaults = .standard, cacheURL: URL? = AppFolders.scanCache) {
+    /// `cacheURL` is where scans keep their cache, and `waveformFolder` where
+    /// the player keeps waveforms; nil turns either off.
+    init(defaults: UserDefaults = .standard, cacheURL: URL? = AppFolders.scanCache, waveformFolder: URL? = AppFolders.waveforms) {
         self.defaults = defaults
         self.cacheURL = cacheURL
         results = ResultsModel(defaults: defaults)
+        player = PlayerModel(defaults: defaults, waveforms: waveformFolder.map { WaveformCache(folder: $0) })
         folders = (defaults.stringArray(forKey: Self.foldersKey) ?? [])
             .map { URL(filePath: $0, directoryHint: .isDirectory) }
     }
@@ -67,6 +71,8 @@ final class LibraryModel {
 
     func scan() {
         guard canScan else { return }
+        // The results, player included, make way for the scan's progress.
+        player.unload()
         let id = UUID()
         scanID = id
         let previous = state

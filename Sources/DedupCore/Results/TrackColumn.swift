@@ -139,7 +139,7 @@ public enum TrackColumn: Hashable, Sendable {
     // MARK: - Formatting
 
     /// "3:45", or "1:02:03" from an hour.
-    static func formatDuration(_ seconds: Double) -> String {
+    public static func formatDuration(_ seconds: Double) -> String {
         let total = Int(seconds.rounded())
         let (hours, minutes, secs) = (total / 3600, total / 60 % 60, total % 60)
         let tail = String(format: "%02d", secs)
