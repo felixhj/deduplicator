@@ -3,8 +3,9 @@
 A native macOS app for finding and removing duplicate music files, by comparing
 tags intelligently instead of by file hash.
 
-> **Status:** pre-alpha. The v1 scope is agreed. See [`docs/SPEC.md`](docs/SPEC.md)
-> for requirements and [`docs/ROADMAP.md`](docs/ROADMAP.md) for build phases.
+> **Status:** v1 is built and being tested by hand, using the checklist in
+> [`docs/TESTING.md`](docs/TESTING.md). See [`docs/SPEC.md`](docs/SPEC.md) for
+> what it does and [`docs/ROADMAP.md`](docs/ROADMAP.md) for how it was built.
 
 ## Why
 
@@ -23,7 +24,7 @@ suffixes, pulls featured artists out, folds accents and punctuation, and so on.
 Then it compares the cleaned values, with a matching strictness you choose for
 each field.
 
-## Features (planned)
+## Features
 
 - **Tag-aware matching** on title and artist. Each field can require an
   identical, similar or fuzzy match, with an adjustable threshold.
@@ -35,12 +36,12 @@ each field.
   audio rather than the length tag; same or different track number; and more.
 - **Grouped results view** that shows each duplicate group with configurable,
   resizable and reorderable columns. Any tag in the file can be a column.
-- **Built-in player** for A/B listening within a group.
+- **Built-in player** for A/B listening within a group: switching copies
+  carries on from the same point, and a waveform shows where you are.
 - **Choosing the copy to keep:** pick by hand or with auto-select rules, such
-  as highest bitrate, lossless over lossy, or longest.
-- **Waveform view** in the player.
+  as highest bitrate, lossless over lossy, or longest, with a preview.
 - **Basic tag copying:** take tag values from one copy and write them to the
-  keeper.
+  keeper, after reviewing every change.
 - **Safe removal:** send the selected files to the Bin, or move them to a folder
   you choose, with the folder structure mirrored. Every removal is logged and
   can be undone.

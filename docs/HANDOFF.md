@@ -1,41 +1,38 @@
 # Handoff
 
-Read this, then `CLAUDE.md`, `docs/SPEC.md` and `docs/ROADMAP.md`. Phase 7
-is on branch `claude/phase-7-removal`, committed locally but not pushed
-(2026-09-29). Phases 0–6 are on `main`.
+Read this, then `CLAUDE.md`, `docs/SPEC.md` and `docs/ROADMAP.md`. Phases 8
+and 9 are on branch `claude/phases-8-9`, committed locally but not pushed
+(2026-09-29). Phases 0–7 are on `main`.
 
 ## Where we are
 
-- Phases 0–7 are done. The app builds in Xcode 27 (Swift 6.4) with no
-  warnings, and every test passes: the package tests (`swift test` or
-  `scripts/test.sh`) and the app tests in `AppTests/` (⌘U in Xcode).
-- Phase 5 added the results screen: the banded table with group headers,
-  collapsing, tick boxes, highlighted differences, any tag as a column, header
-  sorting, a text and confidence filter, the `k`, `d` and ⌘↓ keys, and the
-  match settings inspector.
-- Phase 6 added the player under the table: play, pause, a waveform to seek
-  with, A/B switching between copies at the same position, the ▶ column,
-  space and double-click to play, and a Settings window with the one player
-  setting.
-- Phase 7 added removal and auto-select: a confirm sheet (Bin or a mirrored
-  folder, with warnings), moving in the background with progress and Stop,
-  the JSON log, undo of the last removal (also after a relaunch), and an
-  auto-select sheet with editable keeper rules and a live preview. Removal
-  settings joined the player's in the Settings window.
-- The removal tests move real files, but within a temporary folder that also
-  stands in for the Bin, so `trashItem` itself has only run in the phase 3
-  unit tests' fake. Nobody has removed real music with the app, or clicked
-  through the sheets.
-- The player has only played generated, silent files, in the app tests.
+- All nine phases are done: v1 is feature-complete. The app builds in Xcode 27
+  (Swift 6.4) with no warnings, and every test passes: the package tests
+  (`swift test` or `scripts/test.sh`) and the app tests in `AppTests/` (⌘U).
+- Phase 5 added the results screen, phase 6 the player, phase 7 removal, undo
+  and auto-select, phase 8 copying tags between copies, and phase 9 the
+  polish: the app icon, saved match presets, remembered order and confidence,
+  ⌘F, ⌥⌘I, ← and → in the table, a Keyboard Shortcuts window (⌘?), an About
+  box with the libraries' credits, and a guard against quitting while files
+  are being moved or written.
+- The user hasn't tested along the way: they'll test the finished app by hand
+  from `docs/TESTING.md`. Nothing has been checked against a real library
+  yet. The automated tests use generated files; the removal tests stand in
+  for the Bin with a folder of their own.
 - Nothing has been built on Linux since TagLib was added.
 
 ## Do this first
 
-1. Run the app on a copy of some real music, not the only copy. Auto-select,
-   then remove to the Bin and undo; remove to a folder and undo; and check
-   the files, the results and `RemovalLog.json` each time. Also listen to a
-   group, as phase 6 asked.
-2. Then start phase 8 (copying tags to the keeper).
+1. Help the user work through `docs/TESTING.md`, on a copy of their music,
+   and fix what it finds. Keep the checklist up to date with any change.
+2. Ask about the open questions below.
+
+## Open questions for the user
+
+- SPEC §3.2 says the Fuzzy level defaults to 75%, but the code has used 80%
+  since phase 2 (`MatchLevel.defaultThreshold`). Jaro-Winkler scores unlike
+  short strings generously, so 80% is safer; the slider changes it either
+  way. One of the two should be changed to match.
 
 ## Decisions already made with the user (don't re-ask)
 
@@ -63,6 +60,8 @@ is on branch `claude/phase-7-removal`, committed locally but not pushed
 - Deferred until after v1: audio fingerprinting, library imports, a full tag
   editor.
 - British English in the UI ("Bin", "normalise").
+- The user tests the finished app by hand, from `docs/TESTING.md`, rather
+  than after each phase. Add to it whenever a feature is added or changes.
 
 ## Engine map (`Sources/DedupCore`)
 
@@ -84,6 +83,9 @@ is on branch `claude/phase-7-removal`, committed locally but not pushed
 - `Waveform/`: `Waveform`, the peak and average level of each slice of a
   track, kept to 1/255 so it saves and loads exactly, and resampled to the
   width being drawn.
+- `Tags/`: `TagCopy` (compares two copies' tags, which to tick by default,
+  what to write), `TagEdit` and `TagEditLog`.
+- `Logs/LogFile`: the JSON handling both logs share.
 
 ## Scanner map (`Sources/DedupScanner`, `Sources/CTagLib`)
 
@@ -114,6 +116,8 @@ is on branch `claude/phase-7-removal`, committed locally but not pushed
 - On an Apple silicon Mac, with 20,000 small MP3s already in the disk cache,
   the first scan took 1.6 s and a rescan 0.4 s. The cache is about 0.9 KB per
   track.
+- `AudioFileReader.reread`: reads one track's file again after its tags are
+  written, keeping its ID and scan root.
 - `WaveformReader.read` (macOS only): decodes a file with `AVAudioFile` and
   measures 1,000 slices with vDSP. It stops as soon as its task is cancelled.
 - `WaveformCache`: one small JSON file per audio file, named by a hash of the
@@ -122,9 +126,13 @@ is on branch `claude/phase-7-removal`, committed locally but not pushed
 
 ## App map (`App/`)
 
-- `DeduplicatorApp`: one `Window` and Settings. File menu: Add Folder… (⌘O),
-  Scan (⌘R), Stop Scan (⌘.), Remove Marked Files… (⌘⌫) and Undo Removal of
-  N Files. Edit menu: Auto-Select Keepers… and Unmark All.
+- `DeduplicatorApp`: the main `Window`, Settings, and a Keyboard Shortcuts
+  window. File menu: Add Folder… (⌘O), Scan (⌘R), Stop Scan (⌘.), Remove
+  Marked Files… (⌘⌫) and Undo Removal of N Files. Edit menu: Find… (⌘F),
+  Auto-Select Keepers…, Unmark All and Copy Tags…. View menu: Show Match
+  Settings (⌥⌘I). Help menu: Keyboard Shortcuts (⌘?). The About box credits
+  TagLib and utfcpp. `AppDelegate` holds quitting back while
+  `LibraryModel.isChangingFiles`.
 - `Library/LibraryModel` (`@MainActor`, `@Observable`): the folders (kept in
   `UserDefaults`), scan state and issues. It owns the `ResultsModel`,
   `PlayerModel` and `RemovalModel`, hands the results each scan's tracks, and
@@ -160,13 +168,22 @@ is on branch `claude/phase-7-removal`, committed locally but not pushed
   log, and undoes the last removal. It remembers each removal's tracks while
   their scan is loaded, so an undo can put them back in the results.
   `RemovalDestination` is the Bin-or-folder setting, kept in `UserDefaults`.
+- `Tags/TagWriter` (`@MainActor`, owned by `LibraryModel`): reads both files'
+  tags, picks the default destination (the only copy not marked), writes off
+  the main actor, re-reads the file into the results, and logs the write.
+  `Tags/CopyTagsSheet` chooses, reviews and writes.
 - `Removal/RemoveSheet`, `UndoSheet` and `AutoSelectSheet` (with
   `KeeperRulesEditor`): presented by `ContentView`, so menu commands work
   whatever the window shows. `RemovalViews` holds their shared parts.
 - `Views/`: `ContentView` (split view, Scan button, folder picker, the
   sheets), `FolderList` (add, remove, drop), `ScanViews` (before the first
-  scan, progress, and the scan report) and `SettingsView` (removal and player
-  settings).
+  scan, progress, and the scan report), `SettingsView` (removal and player
+  settings) and `ShortcutsView`.
+- `Results/MatchSettingsView` also saves and deletes the user's own presets
+  (`SavedPreset`, kept in `UserDefaults` by `ResultsModel`).
+- `AppIcon.icon`: the app icon, an Icon Composer file of three SVG layers
+  that Xcode compiles. XcodeGen treats it as one file, so `project.yml` needs
+  nothing for it.
 - `AppFolders`: `~/Library/Application Support/Deduplicator` (the scan cache
   and `RemovalLog.json`) and `~/Library/Caches/Deduplicator/Waveforms`.
 
@@ -206,12 +223,25 @@ is on branch `claude/phase-7-removal`, committed locally but not pushed
   that, along with folders inside a scanned folder.
 - A SwiftUI `ForEach` over rule indices can read a removed row's binding once
   more, so the rules editor's bindings check the index.
+- `ictool` has no usable help, but `actool` compiles a hand-written `.icon`
+  folder (`icon.json` plus SVG layers) and says clearly when it can't.
+- Menu key equivalents without a modifier, such as space or `d`, would take
+  those keys from the filter field, so the table's single-key shortcuts are
+  listed in the Keyboard Shortcuts window instead of the menus.
+- The removal and tag logs keep ISO 8601 dates, which drop fractions of a
+  second, so compare logged dates in whole seconds.
 
-## Next: phase 8 (copying tags to the keeper)
+## After v1
 
-See `docs/ROADMAP.md` and SPEC §7: in a group, copy chosen tag values from any
-copy to the keeper, and write them with `TagLibFile.write`, only to that file
-and only after a confirmation showing the values before and after. There's no
-free-form editor. Writing changes the file's size and date, so its scan-cache
-and waveform entries miss next time, which is right; the results should take
-the new values without a rescan. Then phase 9 (polish).
+- Work through `docs/TESTING.md` and fix what it finds.
+- Deferred in SPEC §10: audio fingerprinting, importing from the Music.app,
+  Swinsian or Rekordbox libraries, and a full tag editor.
+- Smaller things noticed while building:
+  - The waveform cache is never pruned. It holds about 3 KB for each file
+    ever shown.
+  - Removal undo has no ⌘Z. Tying it to ⌘Z would clash with undoing typing in
+    the filter.
+  - Tag writes can't be undone in the app, though the log has the values
+    before them.
+  - Cover art isn't copied between copies.
+  - `DedupScanner` has never been built on Linux.

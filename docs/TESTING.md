@@ -172,7 +172,30 @@ Use the test copy of your music for these too.
 
 ## Settings, shortcuts and polish
 
-To be written with phase 9.
+- [ ] The app icon looks right in the Dock, the Finder, the App Switcher (⌘⇥)
+      and the About box, in light and dark mode, and with Tinted or Clear
+      icons (System Settings > Appearance).
+- [ ] Deduplicator > About Deduplicator shows the version and credits TagLib
+      and utfcpp.
+- [ ] Help > Keyboard Shortcuts (⌘?) lists the shortcuts, and each one works.
+- [ ] ⌘F puts the cursor in the filter.
+- [ ] View > Show Match Settings (⌥⌘I) shows and hides the match settings,
+      and the menu item's name follows.
+- [ ] ← and → in the table skip back and forward 10 seconds in the copy in
+      the player.
+- [ ] Save the match settings as a preset (the … button beside Preset),
+      choose it again after changing settings, then delete it. Saved presets
+      are kept after quitting and reopening. Saving under a taken name
+      replaces that preset.
+- [ ] The group order (the Order menu or a column heading) and the minimum
+      confidence are kept after quitting and reopening; the filter text isn't.
+- [ ] The window's size and position, the sidebar's width and whether the
+      match settings show are kept after quitting and reopening.
+- [ ] Quit (⌘Q) during a long removal: the app says it's changing files and
+      stays open.
+- [ ] Settings (⌘,) holds the removal and player settings, and both are kept.
+- [ ] Every sheet can be cancelled with Escape, and its main button pressed
+      with Return.
 
 ## A big library
 

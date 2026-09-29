@@ -50,7 +50,8 @@ The code is split into three layers. Keep the boundaries strict.
    plays through `AVAudioPlayer`. `App/Removal/` runs removal, undo and
    auto-select; every file it moves goes through `RemovalExecutor`.
    `App/Tags/` copies tags between copies; every tag it writes goes through
-   `TagLibFile.write`, and is logged. `AppTests/` holds tests hosted in the
+   `TagLibFile.write`, and is logged. `App/AppIcon.icon` is the app icon, an
+   Icon Composer file. `AppTests/` holds tests hosted in the
    app, for the models, the table, the player, removal and tag copying. The
    player tests play silent files, and the removal and tag tests change real
    files within their own temporary folder, which also stands in for the Bin.
