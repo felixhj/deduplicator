@@ -13,15 +13,21 @@ struct ResultsView: View {
         VStack(spacing: 0) {
             ResultsTable(
                 model: results,
+                player: library.player,
                 revision: results.revision,
                 marksRevision: results.marksRevision,
                 columns: results.columns,
-                order: results.order
+                order: results.order,
+                nowPlaying: library.player.nowPlaying
             )
             .overlay { EmptyResultsView(showsSettings: $showsSettings) }
             Divider()
+            PlayerBar(player: library.player)
+            Divider()
             ResultsStatusBar(summary: summary)
         }
+        // Nothing should play on with no way to stop it, as when the window closes.
+        .onDisappear { library.player.pause() }
         .searchable(text: $results.filter.text, placement: .toolbar, prompt: "Filter")
         .toolbar {
             ToolbarItemGroup {

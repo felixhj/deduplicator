@@ -1,4 +1,3 @@
-import AVFoundation
 import DedupCore
 import DedupScanner
 import Foundation
@@ -16,11 +15,11 @@ struct LibraryModelTests {
         defer { try? FileManager.default.removeItem(at: folder) }
         for (name, title) in [("a.wav", "Strings of Life"), ("b.aiff", "Strings Of Life"), ("c.wav", "Something Else")] {
             let url = folder.appending(path: name)
-            try writeSilence(to: url, seconds: 1)
+            try AudioFiles.write(to: url, seconds: 1)
             try TagLibFile.write(["TITLE": [title], "ARTIST": ["Derrick May"]], to: url)
         }
 
-        let library = LibraryModel(defaults: storage.defaults, cacheURL: folder.appending(path: "Cache/ScanCache.json"))
+        let library = LibraryModel(defaults: storage.defaults, cacheURL: folder.appending(path: "Cache/ScanCache.json"), waveformFolder: nil)
         library.addFolders([folder])
         library.scan()
         for _ in 0..<500 where library.isScanning {
@@ -42,35 +41,30 @@ struct LibraryModelTests {
     }
 
     @Test func foldersAreKeptWithoutDuplicates() {
-        let library = LibraryModel(defaults: storage.defaults, cacheURL: nil)
+        let library = LibraryModel(defaults: storage.defaults, cacheURL: nil, waveformFolder: nil)
         let music = URL(filePath: "/Music", directoryHint: .isDirectory)
         library.addFolders([music, URL(filePath: "/Music/", directoryHint: .isDirectory), URL(filePath: "/Other", directoryHint: .isDirectory)])
         #expect(library.folders.count == 2)
 
-        let reopened = LibraryModel(defaults: storage.defaults, cacheURL: nil)
+        let reopened = LibraryModel(defaults: storage.defaults, cacheURL: nil, waveformFolder: nil)
         #expect(reopened.folders.map { $0.path(percentEncoded: false) } == ["/Music/", "/Other/"])
         reopened.removeFolders([reopened.folders[0]])
-        #expect(LibraryModel(defaults: storage.defaults, cacheURL: nil).folders.count == 1)
+        #expect(LibraryModel(defaults: storage.defaults, cacheURL: nil, waveformFolder: nil).folders.count == 1)
+    }
+
+    @Test func scanningEmptiesThePlayer() {
+        let library = LibraryModel(defaults: storage.defaults, cacheURL: nil, waveformFolder: nil)
+        library.addFolders([URL(filePath: "/Nowhere", directoryHint: .isDirectory)])
+        library.player.select(Fixtures.library[0], copies: Array(Fixtures.library.prefix(3)))
+        library.scan()
+        #expect(library.player.track == nil)
+        library.cancelScan()
     }
 
     @Test func scanNeedsAFolder() {
-        let library = LibraryModel(defaults: storage.defaults, cacheURL: nil)
+        let library = LibraryModel(defaults: storage.defaults, cacheURL: nil, waveformFolder: nil)
         #expect(!library.canScan)
         library.scan()
         #expect(!library.isScanning)
-    }
-
-    /// 16-bit PCM silence, in the container the extension names.
-    private func writeSilence(to url: URL, seconds: Double) throws {
-        let settings: [String: Any] = [
-            AVFormatIDKey: kAudioFormatLinearPCM, AVSampleRateKey: 44_100.0, AVNumberOfChannelsKey: 2,
-            AVLinearPCMBitDepthKey: 16, AVLinearPCMIsFloatKey: false, AVLinearPCMIsBigEndianKey: url.pathExtension == "aiff",
-        ]
-        let file = try AVAudioFile(forWriting: url, settings: settings, commonFormat: .pcmFormatInt16, interleaved: false)
-        let frames = AVAudioFrameCount(44_100 * seconds)
-        let buffer = try #require(AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: frames))
-        buffer.frameLength = frames
-        try file.write(from: buffer)
-        file.close()
     }
 }

@@ -95,6 +95,84 @@ final class MarkCellView: NSTableCellView {
     }
 }
 
+/// The ▶ column: a speaker on the copy in the player, and a play or pause
+/// button on the row under the pointer. The button is there on every row,
+/// even when it shows nothing, so a click in the cell always works.
+final class PlayCellView: NSTableCellView {
+    static let identifier = NSUserInterfaceItemIdentifier("PlayCell")
+
+    private let button = NSButton()
+    private var onClick: (() -> Void)?
+    private(set) var isCurrent = false
+    private(set) var isPlaying = false
+
+    var isHovered = false {
+        didSet { if isHovered != oldValue { refresh() } }
+    }
+
+    init() {
+        super.init(frame: .zero)
+        identifier = Self.identifier
+        button.isBordered = false
+        button.imagePosition = .imageOnly
+        button.target = self
+        button.action = #selector(clicked)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(button)
+        NSLayoutConstraint.activate([
+            button.centerXAnchor.constraint(equalTo: centerXAnchor),
+            button.centerYAnchor.constraint(equalTo: centerYAnchor),
+            button.widthAnchor.constraint(equalToConstant: 20),
+            button.heightAnchor.constraint(equalToConstant: 18),
+        ])
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    func configure(isCurrent: Bool, isPlaying: Bool, isHovered: Bool, onClick: @escaping () -> Void) {
+        self.isCurrent = isCurrent
+        self.isPlaying = isPlaying
+        self.isHovered = isHovered
+        self.onClick = onClick
+        refresh()
+    }
+
+    func update(isCurrent: Bool, isPlaying: Bool) {
+        guard isCurrent != self.isCurrent || isPlaying != self.isPlaying else { return }
+        self.isCurrent = isCurrent
+        self.isPlaying = isPlaying
+        refresh()
+    }
+
+    /// The symbol the button shows, if any.
+    var symbolName: String? {
+        switch (isCurrent, isHovered) {
+        case (true, false): isPlaying ? "speaker.wave.2.fill" : "speaker.fill"
+        case (true, true): isPlaying ? "pause.fill" : "play.fill"
+        case (false, true): "play.fill"
+        case (false, false): nil
+        }
+    }
+
+    override var backgroundStyle: NSView.BackgroundStyle {
+        didSet { refresh() }
+    }
+
+    private func refresh() {
+        button.image = symbolName.flatMap { NSImage(systemSymbolName: $0, accessibilityDescription: nil) }
+        button.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 11, weight: .regular)
+        button.contentTintColor = backgroundStyle == .emphasized ? .alternateSelectedControlTextColor
+            : isCurrent ? .controlAccentColor : .secondaryLabelColor
+        button.setAccessibilityLabel(isCurrent && isPlaying ? "Pause" : "Play")
+    }
+
+    @objc private func clicked() {
+        onClick?()
+    }
+}
+
 /// The full-width row above each group: a disclosure button, the track, and
 /// how many copies there are, how confident the match is and why.
 final class GroupHeaderView: NSTableCellView {

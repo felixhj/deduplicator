@@ -27,13 +27,7 @@ final class GroupItem {
 
     /// "Energy 52 – Café Del Mar", from the first copy.
     var title: String {
-        guard let track = copies.first?.track else { return "" }
-        switch (track.artist.isEmpty, track.title.isEmpty) {
-        case (false, false): return "\(track.artist) – \(track.title)"
-        case (true, false): return track.title
-        case (false, true): return track.artist
-        case (true, true): return track.url.lastPathComponent
-        }
+        copies.first?.track.displayName ?? ""
     }
 
     /// "3 copies · 97% · Same title · Same artist".
@@ -53,5 +47,17 @@ final class CopyItem {
     init(track: Track, group: GroupItem) {
         self.track = track
         self.group = group
+    }
+}
+
+extension Track {
+    /// "Energy 52 – Café Del Mar", or whichever of the two it has, or else the file name.
+    var displayName: String {
+        switch (artist.isEmpty, title.isEmpty) {
+        case (false, false): "\(artist) – \(title)"
+        case (true, false): title
+        case (false, true): artist
+        case (true, true): url.lastPathComponent
+        }
     }
 }

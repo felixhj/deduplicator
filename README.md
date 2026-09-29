@@ -73,9 +73,10 @@ Sources/DedupCore/       Platform-independent matching engine (normalisation,
                          similarity, grouping, removal plans). Builds on Linux too.
 Sources/DedupScanner/    Folder scanning: finds audio files, reads tags with
                          TagLib, measures decoded duration, keeps the scan cache.
+                         Also draws the player's waveforms.
 Sources/CTagLib/         TagLib, vendored as source, with a small C interface.
 App/                     macOS SwiftUI app: UI, player and file operations.
-AppTests/                Tests hosted in the app, for its models and table.
+AppTests/                Tests hosted in the app, for its models, table and player.
 Tests/                   Tests for DedupCore and DedupScanner.
 scripts/                 Test and build helpers.
 docs/                    Spec, roadmap and design notes.

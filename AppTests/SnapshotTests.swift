@@ -12,17 +12,31 @@ import Testing
 @Suite(.enabled(if: ProcessInfo.processInfo.environment["SNAPSHOT_DIR"] != nil))
 struct SnapshotTests {
     let storage = TestDefaults()
+    let folder = TemporaryFolder()
 
+    /// A copy in the player, paused partway through, with its waveform drawn:
+    /// a swell, a break and a louder second half.
     @Test(arguments: [("light", NSAppearance.Name.aqua), ("dark", NSAppearance.Name.darkAqua)])
     func resultsScreen(name: String, appearance: NSAppearance.Name) async throws {
         let directory = URL(filePath: ProcessInfo.processInfo.environment["SNAPSHOT_DIR"]!, directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
 
-        let library = LibraryModel(defaults: storage.defaults)
-        library.results.load(Fixtures.library)
+        let tracks = try Fixtures.playableLibrary(in: folder.url, seconds: 12) { time in
+            let beat = 0.55 + 0.45 * abs(sin(time * .pi * 2))
+            switch time {
+            case ..<3: return time / 3 * 0.5 * beat
+            case ..<4.5: return 0.08
+            default: return (0.6 + 0.02 * (time - 4.5)) * beat
+            }
+        }
+        let library = LibraryModel(defaults: storage.defaults, cacheURL: nil, waveformFolder: nil)
+        library.results.load(tracks)
         library.results.setMarked([2], true)
         try await waitForMatching(library.results)
-        let summary = ScanSummary(result: ScanResult(tracks: Fixtures.library), elapsed: .seconds(2))
+        library.player.select(tracks[1], copies: Array(tracks[0...2]))
+        library.player.seek(to: 5)
+        try await waitUntil("the waveform") { !library.player.isDrawingWaveform }
+        let summary = ScanSummary(result: ScanResult(tracks: tracks), elapsed: .seconds(2))
 
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1500, height: 560), styleMask: [.titled, .resizable], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
@@ -51,10 +65,22 @@ struct SnapshotTests {
         window.close()
     }
 
+    @Test func settings() async throws {
+        let directory = URL(filePath: ProcessInfo.processInfo.environment["SNAPSHOT_DIR"]!, directoryHint: .isDirectory)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 460, height: 160), styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        let host = NSHostingView(rootView: SettingsView().defaultAppStorage(storage.defaults))
+        window.contentView = host
+        host.layoutSubtreeIfNeeded()
+        try await Task.sleep(for: .milliseconds(300))
+        try save(host, as: "app-settings", in: directory)
+        window.close()
+    }
+
     /// The whole window, title bar and toolbar included.
     @Test func mainWindow() async throws {
         let directory = URL(filePath: ProcessInfo.processInfo.environment["SNAPSHOT_DIR"]!, directoryHint: .isDirectory)
-        let library = LibraryModel(defaults: storage.defaults)
+        let library = LibraryModel(defaults: storage.defaults, cacheURL: nil, waveformFolder: nil)
         library.addFolders([URL(filePath: "/Music", directoryHint: .isDirectory)])
         library.results.load(Fixtures.library)
         try await waitForMatching(library.results)

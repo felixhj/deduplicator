@@ -23,5 +23,9 @@ struct DeduplicatorApp: App {
                     .disabled(!library.isScanning)
             }
         }
+
+        Settings {
+            SettingsView()
+        }
     }
 }

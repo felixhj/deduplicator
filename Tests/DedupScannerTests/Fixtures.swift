@@ -71,9 +71,27 @@ import AVFoundation
 
 extension AudioFixtures {
     /// Encodes a quiet 440 Hz tone with Core Audio. The container comes from the
-    /// extension: AAC or ALAC in ".m4a", FLAC in ".flac", PCM in ".aiff". The
-    /// samples are 16-bit, because the FLAC encoder writes 24-bit files from float input.
+    /// extension: AAC or ALAC in ".m4a", FLAC in ".flac", PCM in ".aiff" or ".wav".
     static func encode(to url: URL, format: AudioFormat, seconds: Double, sampleRate: Double = 44_100) throws {
+        try encode(to: url, format: format, frames: Int(sampleRate * seconds), sampleRate: sampleRate) { frame in
+            3000 * sin(2 * .pi * 440 * Double(frame) / sampleRate)
+        }
+    }
+
+    /// A 441 Hz square wave that holds each amplitude (0 to 1) for `seconds`.
+    /// Every sample of a step is plus or minus its amplitude, so the step's
+    /// peak and root mean square are both the amplitude.
+    static func encodeSteps(to url: URL, format: AudioFormat, amplitudes: [Double], seconds: Double, sampleRate: Double = 44_100) throws {
+        let stepFrames = Int(sampleRate * seconds)
+        try encode(to: url, format: format, frames: stepFrames * amplitudes.count, sampleRate: sampleRate) { frame in
+            let sign: Double = frame % 100 < 50 ? 1 : -1
+            return sign * amplitudes[frame / stepFrames] * Double(Int16.max)
+        }
+    }
+
+    /// The samples are 16-bit, because the FLAC encoder writes 24-bit files
+    /// from float input.
+    private static func encode(to url: URL, format: AudioFormat, frames: Int, sampleRate: Double, sample: (Int) -> Double) throws {
         var settings: [String: Any] = [AVSampleRateKey: sampleRate, AVNumberOfChannelsKey: 2]
         switch format {
         case .aac:
@@ -85,22 +103,21 @@ extension AudioFixtures {
         case .flac:
             settings[AVFormatIDKey] = kAudioFormatFLAC
             settings[AVEncoderBitDepthHintKey] = 16
-        case .aiff:
+        case .aiff, .wav:
             settings[AVFormatIDKey] = kAudioFormatLinearPCM
             settings[AVLinearPCMBitDepthKey] = 16
-            settings[AVLinearPCMIsBigEndianKey] = true
+            settings[AVLinearPCMIsBigEndianKey] = format == .aiff
             settings[AVLinearPCMIsFloatKey] = false
         default:
             preconditionFailure("Core Audio can't encode \(format)")
         }
         let file = try AVAudioFile(forWriting: url, settings: settings, commonFormat: .pcmFormatInt16, interleaved: false)
-        let frames = AVAudioFrameCount(sampleRate * seconds)
-        let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: frames)!
-        buffer.frameLength = frames
+        let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(frames))!
+        buffer.frameLength = AVAudioFrameCount(frames)
         for channel in 0..<Int(buffer.format.channelCount) {
             let samples = buffer.int16ChannelData![channel]
-            for frame in 0..<Int(frames) {
-                samples[frame] = Int16(3000 * sin(2 * .pi * 440 * Double(frame) / sampleRate))
+            for frame in 0..<frames {
+                samples[frame] = Int16(sample(frame))
             }
         }
         try file.write(from: buffer)

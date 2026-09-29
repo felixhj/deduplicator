@@ -30,22 +30,26 @@ The code is split into three layers. Keep the boundaries strict.
    - auto-select ("keeper") rules, and the removal plan and executor
    - the results logic behind the table (`Results/`): column values, which
      cells differ within a group, filtering and ordering groups
+   - `Waveform`: a track's peak and average level over time, for the player
 
    It must compile and pass its tests on Linux (`swift test`), so Claude can
    verify it in the cloud container, which has no Xcode.
 2. **`DedupScanner`** turns folders into `Track`s. It finds audio files, reads
    tags and stream properties with TagLib, measures decoded duration with
-   `AVAudioFile`, and keeps the scan cache. TagLib is vendored as source in
-   **`CTagLib`**, a C++ target with a small C interface, so Swift needs no C++
-   interop (see `Sources/CTagLib/README.md`). Both are package targets, so they
-   build and test with `swift test` without Xcode. AVFoundation code sits
-   behind `#if canImport(AVFoundation)`, so the rest should also build on Linux.
+   `AVAudioFile`, and keeps the scan cache. It also draws the player's
+   waveforms (`WaveformReader`) and keeps them on disk (`WaveformCache`).
+   TagLib is vendored as source in **`CTagLib`**, a C++ target with a small C
+   interface, so Swift needs no C++ interop (see `Sources/CTagLib/README.md`).
+   Both are package targets, so they build and test with `swift test` without
+   Xcode. AVFoundation code sits behind `#if canImport(AVFoundation)`, so the
+   rest should also build on Linux.
 3. **`App/`** (the macOS app, built from `project.yml` with XcodeGen) holds the
    SwiftUI/AppKit UI and the player, and ties the other two together. It
    depends on the `DedupCore` and `DedupScanner` products. The results table is
-   an `NSTableView` (see `App/Results/Table/`). Tag writing (phase 8) goes
-   through `TagLibFile.write`. `AppTests/` holds tests hosted in the app, for
-   the models and the table.
+   an `NSTableView` (see `App/Results/Table/`). The player (`App/Player/`)
+   plays through `AVAudioPlayer`. Tag writing (phase 8) goes through
+   `TagLibFile.write`. `AppTests/` holds tests hosted in the app, for the
+   models, the table and the player. The player tests play silent files.
 
 ## Conventions
 
@@ -84,6 +88,8 @@ TEST_RUNNER_SNAPSHOT_DIR=/tmp/shots xcodebuild -project Deduplicator.xcodeproj \
 
 The capture can't draw SwiftUI's glass and material views, such as toolbar
 buttons and the inspector's background, so those come out blank or garbled.
+It also has no window background behind it, so anything see-through, such as
+a `Divider`, comes out too light in dark mode.
 
 ## Environment notes for Claude
 

@@ -8,12 +8,14 @@ import Testing
 @MainActor
 struct ResultsTableTests {
     let storage = TestDefaults()
+    let folder = TemporaryFolder()
 
-    func makeTable() async throws -> (ResultsModel, ResultsTableController) {
+    /// The fixture library in a table. Its files don't exist unless `playable`.
+    func makeTable(playable: Bool = false) async throws -> (ResultsModel, ResultsTableController) {
         let model = ResultsModel(defaults: storage.defaults)
-        model.load(Fixtures.library)
+        model.load(playable ? try Fixtures.playableLibrary(in: folder.url) : Fixtures.library)
         try await waitForMatching(model)
-        let table = ResultsTableController(model: model)
+        let table = ResultsTableController(model: model, player: PlayerModel(defaults: storage.defaults))
         table.update()
         return (model, table)
     }
@@ -43,21 +45,30 @@ struct ResultsTableTests {
 
     @Test func columnsFollowTheModel() async throws {
         let (model, table) = try await makeTable()
-        #expect(columnIDs(table) == ["mark"] + TrackColumn.defaults.map(\.id))
+        #expect(columnIDs(table) == ["mark", "play"] + TrackColumn.defaults.map(\.id))
         model.toggleColumn(.tag("INITIALKEY"))
         table.update()
         #expect(columnIDs(table).last == "tag:INITIALKEY")
         model.columns = [.artist, .title]
         table.update()
-        #expect(columnIDs(table) == ["mark", "artist", "title"])
+        #expect(columnIDs(table) == ["mark", "play", "artist", "title"])
     }
 
     @Test func movingAColumnUpdatesTheModel() async throws {
         let (model, table) = try await makeTable()
         model.columns = [.title, .artist, .album]
         table.update()
-        table.tableView.moveColumn(3, toColumn: 1)
+        table.tableView.moveColumn(4, toColumn: 2)
         #expect(model.columns == [.album, .title, .artist])
+    }
+
+    @Test func tickBoxAndPlayColumnsStayFirst() async throws {
+        let (_, table) = try await makeTable()
+        let tableView = table.tableView
+        #expect(!table.tableView(tableView, shouldReorderColumn: 1, toColumn: 3))
+        #expect(!table.tableView(tableView, shouldReorderColumn: 3, toColumn: 1))
+        #expect(!table.tableView(tableView, shouldReorderColumn: 0, toColumn: 2))
+        #expect(table.tableView(tableView, shouldReorderColumn: 3, toColumn: 2))
     }
 
     @Test func clickingAHeaderOrdersByThatColumn() async throws {
@@ -197,7 +208,7 @@ extension ResultsTableTests {
         title.width = 333
         #expect(model.columnWidths["title"] == 333)
 
-        let reopened = ResultsTableController(model: model)
+        let reopened = ResultsTableController(model: model, player: table.player)
         reopened.update()
         #expect(reopened.tableView.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier("title"))?.width == 333)
     }
@@ -216,7 +227,7 @@ extension ResultsTableTests {
         }
         #expect(model.groups.count == 20_000)
 
-        let table = ResultsTableController(model: model)
+        let table = ResultsTableController(model: model, player: PlayerModel(defaults: storage.defaults))
         let loading = clock.measure { table.update() }
         #expect(table.tableView.numberOfRows == 70_000)
 
@@ -238,5 +249,81 @@ extension ResultsTableTests {
         try await Task.sleep(for: .milliseconds(50))
         #expect(model.selection == [3])
         #expect(table.selectedTrackIDs == [3])
+    }
+}
+
+/// The ▶ column, space, and the player following the selection.
+extension ResultsTableTests {
+    func playCell(_ table: ResultsTableController, row: Int) -> PlayCellView? {
+        let column = table.tableView.column(withIdentifier: ResultsTableController.playColumnID)
+        return table.tableView.view(atColumn: column, row: row, makeIfNecessary: false) as? PlayCellView
+    }
+
+    @Test func aCopySelectedOnItsOwnGoesIntoThePlayer() async throws {
+        let (_, table) = try await makeTable()
+        table.tableView.selectRowIndexes([2], byExtendingSelection: false)
+        #expect(table.player.track?.id == 1)
+        table.tableView.selectRowIndexes([1, 5], byExtendingSelection: false)
+        #expect(table.player.track?.id == 1, "Several selected copies leave the player alone")
+        table.tableView.keyDown(with: keyEvent(downArrow, modifiers: .command, keyCode: 125))
+        #expect(table.player.track?.id == 3)
+        #expect(!table.player.isPlaying)
+    }
+
+    @Test func spacePlaysAndPauses() async throws {
+        let (_, table) = try await makeTable(playable: true)
+        let player = table.player
+        table.tableView.keyDown(with: keyEvent(" "))
+        #expect(player.track == nil, "Nothing selected, nothing to play")
+
+        table.tableView.selectRowIndexes([1], byExtendingSelection: false)
+        table.tableView.keyDown(with: keyEvent(" "))
+        #expect(player.nowPlaying == NowPlaying(trackID: 0, isPlaying: true))
+        table.tableView.keyDown(with: keyEvent(" "))
+        #expect(player.nowPlaying == NowPlaying(trackID: 0, isPlaying: false))
+    }
+
+    @Test func thePlayButtonSelectsAndPlaysItsRow() async throws {
+        let (model, table) = try await makeTable(playable: true)
+        let window = realise(table)
+        defer { window.close() }
+        let tableView = table.tableView
+        #expect(playCell(table, row: 5)?.symbolName == nil)
+
+        // The pointer moves over the row.
+        let middle = tableView.convert(NSPoint(x: tableView.rect(ofRow: 5).midX, y: tableView.rect(ofRow: 5).midY), to: nil)
+        tableView.mouseMoved(with: mouseEvent(.mouseMoved, at: middle, in: window))
+        #expect(tableView.hoveredRow == 5)
+        let cell = try #require(playCell(table, row: 5))
+        #expect(cell.symbolName == "play.fill")
+        try #require(cell.subviews.compactMap { $0 as? NSButton }.first).performClick(nil)
+        #expect(model.selection == [3])
+        #expect(table.player.nowPlaying == NowPlaying(trackID: 3, isPlaying: true))
+
+        table.update()
+        #expect(cell.symbolName == "pause.fill", "Under the pointer, the playing copy offers to pause")
+        tableView.mouseExited(with: mouseEvent(.mouseExited, at: .zero, in: window))
+        #expect(tableView.hoveredRow == -1)
+        #expect(playCell(table, row: 5)?.symbolName == "speaker.wave.2.fill")
+        #expect(playCell(table, row: 6)?.symbolName == nil)
+        table.player.pause()
+        table.update()
+        #expect(playCell(table, row: 5)?.symbolName == "speaker.fill")
+    }
+
+    @Test func whilePlayingTheSelectionTakesOver() async throws {
+        let (_, table) = try await makeTable(playable: true)
+        let player = table.player
+        table.tableView.selectRowIndexes([1], byExtendingSelection: false)
+        player.seek(to: 1)
+        player.play()
+        table.tableView.selectRowIndexes([2], byExtendingSelection: false)
+        #expect(player.nowPlaying == NowPlaying(trackID: 1, isPlaying: true))
+        #expect(player.position >= 1, "Another copy carries on from the same point")
+
+        table.tableView.selectRowIndexes([5], byExtendingSelection: false)
+        #expect(player.nowPlaying == NowPlaying(trackID: 3, isPlaying: true))
+        #expect(player.position == 0, "Another track starts from the top")
+        player.pause()
     }
 }
