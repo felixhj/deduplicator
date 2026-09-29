@@ -1,12 +1,12 @@
 # Handoff
 
-Read this, then `CLAUDE.md`, `docs/SPEC.md` and `docs/ROADMAP.md`. Phase 6
-is on branch `claude/phase-6-player`, committed locally but not pushed
-(2026-09-29). Phases 0–5 are on `main`.
+Read this, then `CLAUDE.md`, `docs/SPEC.md` and `docs/ROADMAP.md`. Phase 7
+is on branch `claude/phase-7-removal`, committed locally but not pushed
+(2026-09-29). Phases 0–6 are on `main`.
 
 ## Where we are
 
-- Phases 0–6 are done. The app builds in Xcode 27 (Swift 6.4) with no
+- Phases 0–7 are done. The app builds in Xcode 27 (Swift 6.4) with no
   warnings, and every test passes: the package tests (`swift test` or
   `scripts/test.sh`) and the app tests in `AppTests/` (⌘U in Xcode).
 - Phase 5 added the results screen: the banded table with group headers,
@@ -17,18 +17,25 @@ is on branch `claude/phase-6-player`, committed locally but not pushed
   with, A/B switching between copies at the same position, the ▶ column,
   space and double-click to play, and a Settings window with the one player
   setting.
-- The player has only played generated, silent files, in the app tests. The
-  snapshots show the player bar and ▶ column, but nobody has listened to real
-  music with it, clicked the ▶ buttons or dragged along the waveform.
+- Phase 7 added removal and auto-select: a confirm sheet (Bin or a mirrored
+  folder, with warnings), moving in the background with progress and Stop,
+  the JSON log, undo of the last removal (also after a relaunch), and an
+  auto-select sheet with editable keeper rules and a live preview. Removal
+  settings joined the player's in the Settings window.
+- The removal tests move real files, but within a temporary folder that also
+  stands in for the Bin, so `trashItem` itself has only run in the phase 3
+  unit tests' fake. Nobody has removed real music with the app, or clicked
+  through the sheets.
+- The player has only played generated, silent files, in the app tests.
 - Nothing has been built on Linux since TagLib was added.
 
 ## Do this first
 
-1. Run the app on a real music folder. Listen to a group: select a copy,
-   press space, then click the other copies while it plays. Check the switch
-   is quick and keeps the position, that dragging along the waveform seeks,
-   and that the ▶ button appears on the row under the pointer.
-2. Then start phase 7 (removal and auto-select).
+1. Run the app on a copy of some real music, not the only copy. Auto-select,
+   then remove to the Bin and undo; remove to a folder and undo; and check
+   the files, the results and `RemovalLog.json` each time. Also listen to a
+   group, as phase 6 asked.
+2. Then start phase 8 (copying tags to the keeper).
 
 ## Decisions already made with the user (don't re-ask)
 
@@ -67,8 +74,10 @@ is on branch `claude/phase-6-player`, committed locally but not pushed
 - `Matching/`: `Similarity`, `MatchCriteria` (with presets) and
   `MatchEngine.findDuplicates(in:progress:)`, which blocks, compares in
   parallel and groups with union-find plus an anchor check.
-- `Selection/`: `KeeperSelector`, `RemovalPlanner`, `RemovalExecutor` (through
-  `FileMover`) and `RemovalLog`.
+- `Selection/`: `KeeperSelector` (rules, and `choices` for each group's keeper),
+  `RemovalPlanner` (Bin or mirrored folder, and `moveIntoFolders` to refuse a
+  folder that would put files back in a scanned one), `RemovalExecutor`
+  (through `FileMover`, with progress and stopping) and `RemovalLog`.
 - `Results/`: `TrackColumn` (each column's title, cell text and sort key),
   `GroupDifferences` (which copies differ), `ResultFilter`, `SearchIndex`,
   `GroupOrder` and `GroupArrangement`.
@@ -113,15 +122,21 @@ is on branch `claude/phase-6-player`, committed locally but not pushed
 
 ## App map (`App/`)
 
-- `DeduplicatorApp`: one `Window`, with Add Folder… (⌘O), Scan (⌘R) and Stop
-  Scan (⌘.) commands.
+- `DeduplicatorApp`: one `Window` and Settings. File menu: Add Folder… (⌘O),
+  Scan (⌘R), Stop Scan (⌘.), Remove Marked Files… (⌘⌫) and Undo Removal of
+  N Files. Edit menu: Auto-Select Keepers… and Unmark All.
 - `Library/LibraryModel` (`@MainActor`, `@Observable`): the folders (kept in
-  `UserDefaults`), scan state and issues. It owns the `ResultsModel` and hands
-  it each scan's tracks.
+  `UserDefaults`), scan state and issues. It owns the `ResultsModel`,
+  `PlayerModel` and `RemovalModel`, hands the results each scan's tracks, and
+  says which commands are available (`canScan`, `canRemove`, …). Commands wait
+  while a sheet is up, because a window shows one sheet at a time.
 - `Results/ResultsModel`: runs `MatchEngine` off the main actor after a scan and
   after settings change (with a 300 ms pause, cancelling any older run), and
-  holds the filter, order, columns, widths, marks and selection. Match
-  settings and the column layout are saved in `UserDefaults`.
+  holds the filter, order, columns, widths, marks, selection and keeper rules.
+  Match settings, the column layout and the rules are saved in
+  `UserDefaults`. `remove` takes removed copies out (groups left with one copy
+  go) and `restore` puts undone ones back and matches again. `generation`
+  counts scans, since track IDs belong to one scan.
 - `Results/Table/`: `ResultsTableController` drives a flat `ResultsTableView`
   (an `NSTableView`): a full-width `GroupHeaderView` row per group, then a row
   per copy, painted by `BandRowView`. It rebuilds rows when the model's
@@ -140,11 +155,20 @@ is on branch `claude/phase-6-player`, committed locally but not pushed
   the table calls; `play`, `pause`, `seek` and `unload` do the rest.
 - `Player/PlayerBar` and `WaveformView`: the bar under the table. Only
   `PlayerTimeline` reads the position, so only it redraws while playing.
-- `Views/`: `ContentView` (split view, Scan button, folder picker),
-  `FolderList` (add, remove, drop), `ScanViews` (before the first scan,
-  progress, and the scan report) and `SettingsView` (the Settings window).
-- `AppFolders`: `~/Library/Application Support/Deduplicator`, which the removal
-  log will share, and `~/Library/Caches/Deduplicator/Waveforms`.
+- `Removal/RemovalModel` (`@MainActor`, `@Observable`): plans with
+  `RemovalPlanner`, moves with `RemovalExecutor` in a detached task, keeps the
+  log, and undoes the last removal. It remembers each removal's tracks while
+  their scan is loaded, so an undo can put them back in the results.
+  `RemovalDestination` is the Bin-or-folder setting, kept in `UserDefaults`.
+- `Removal/RemoveSheet`, `UndoSheet` and `AutoSelectSheet` (with
+  `KeeperRulesEditor`): presented by `ContentView`, so menu commands work
+  whatever the window shows. `RemovalViews` holds their shared parts.
+- `Views/`: `ContentView` (split view, Scan button, folder picker, the
+  sheets), `FolderList` (add, remove, drop), `ScanViews` (before the first
+  scan, progress, and the scan report) and `SettingsView` (removal and player
+  settings).
+- `AppFolders`: `~/Library/Application Support/Deduplicator` (the scan cache
+  and `RemovalLog.json`) and `~/Library/Caches/Deduplicator/Waveforms`.
 
 ## Things learned the hard way
 
@@ -176,12 +200,18 @@ is on branch `claude/phase-6-player`, committed locally but not pushed
   notifications instead.
 - Hovering reads the real pointer, so it only counts in a visible window.
   Otherwise a test's off-screen window could pick up wherever the pointer is.
+- If the chosen folder holds a scanned folder with the same name as its scan
+  root, the mirrored destination is the file's own path, and the executor
+  would rename the file in place. `RemovalPlanner.moveIntoFolders` catches
+  that, along with folders inside a scanned folder.
+- A SwiftUI `ForEach` over rule indices can read a removed row's binding once
+  more, so the rules editor's bindings check the index.
 
-## Next: phase 7 (removal and auto-select)
+## Next: phase 8 (copying tags to the keeper)
 
-See `docs/ROADMAP.md` and SPEC §6 and §8: a confirm sheet, then the Bin or a
-mirrored move through `RemovalExecutor`, the JSON log, undo of the last
-removal, and auto-select with editable rules and a preview. The planning and
-keeper logic in `DedupCore/Selection` is done and tested. Removal settings can
-join the player's in `SettingsView`. The player should let go of a copy that's
-removed while it's in the player. Then phase 8 (tag copying).
+See `docs/ROADMAP.md` and SPEC §7: in a group, copy chosen tag values from any
+copy to the keeper, and write them with `TagLibFile.write`, only to that file
+and only after a confirmation showing the values before and after. There's no
+free-form editor. Writing changes the file's size and date, so its scan-cache
+and waveform entries miss next time, which is right; the results should take
+the new values without a rescan. Then phase 9 (polish).

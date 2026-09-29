@@ -206,11 +206,19 @@ every member matches the group's anchor (configurable).
 ## 6. Choosing keepers
 
 - By hand: tick the files to delete. The app warns if every file in a group is
-  ticked.
-- **Auto-select** rules, applied in order and user-editable:
-  prefer lossless → higher bitrate → higher sample rate → longer duration →
-  more tags filled → path contains/doesn't contain X → oldest/newest file.
-- "Auto-select all groups" with a preview of the result.
+  ticked. Unmark All (Edit menu) clears every mark.
+- **Auto-select** (the toolbar, or Edit > Auto-Select Keepers…) keeps the best
+  copy in each group shown and marks the others, replacing any marks in those
+  groups. Groups the filter hides are left alone.
+- Its rules are applied in order and are user-editable: add, remove, and drag
+  to reorder. The first rule that tells two copies apart decides, and a tie
+  keeps the group's first copy. The default rules are prefer lossless →
+  higher bitrate → higher sample rate → higher bit depth → longer duration →
+  more tags filled in. Larger file, older file, newer file, path contains or
+  doesn't contain some text, and prefer a format can be added. The rules are
+  saved.
+- The sheet previews the result as the rules change: how many copies it marks
+  and their size, and each group's keeper and marked copies.
 
 ## 7. Basic tag editing
 
@@ -223,18 +231,39 @@ every member matches the group's anchor (configurable).
 
 ## 8. Removal
 
-- The user chooses what happens on **Remove** in Settings, and can change it
-  in the confirm sheet:
+- **Remove** (the toolbar, or File > Remove Marked Files…, ⌘⌫) opens a confirm
+  sheet. It shows the file count and total size, warns when every copy in a
+  group is marked or when marked copies are in groups the filter hides, says
+  where the files go, and lists them.
+- The user chooses where removed files go in Settings, and can change it in
+  the confirm sheet, which remembers the choice:
   1. **Move to Bin** (`FileManager.trashItem`, so the files can be restored from
      the Bin)
   2. **Move to folder**: the user picks a destination, and the **folder
      structure is mirrored** relative to the scanned root. For example,
-     `Root/A/B/x.mp3` goes to `Dest/<RootName>/A/B/x.mp3`.
-- A confirm sheet shows the file count and total size.
-- Every operation is appended to a JSON log (timestamp, original path,
-  destination), stored in Application Support.
-- **Undo last removal** moves the files back to their original paths. Undo
-  from the Bin uses the destination URL that `trashItem` returns.
+     `Root/A/B/x.mp3` goes to `Dest/<RootName>/A/B/x.mp3`. The sheet shows
+     where the first file goes. It refuses a folder that would put files
+     inside a scanned folder, where the next scan would find them. That
+     includes a scanned folder's parent, where the mirrored path is the
+     file's own.
+- Files are moved in the background with progress. Stop stops before the next
+  file, and what was moved can be undone. Files that can't be moved are
+  listed with the reason, and stay marked.
+- Moved copies leave the results: their groups lose them, and a group left
+  with one copy goes. Matching again doesn't bring them back. The player lets
+  go of a removed copy.
+- Every operation is appended to a JSON log in
+  `~/Library/Application Support/Deduplicator/RemovalLog.json`: when, where
+  to, each file's original path and destination, the failures, and when it
+  was undone with any files that couldn't be put back. A log that can't be
+  read is put aside, never written over.
+- **Undo** (the status bar after a removal, or File > Undo Removal of N Files)
+  moves the files of the last removal not yet undone back to their original
+  paths, even after the app is reopened. Undoing again undoes the one before.
+  Undo from the Bin uses the destination URL that `trashItem` returns. A file
+  whose original path is taken again isn't overwritten. The copies return to
+  the results if the scan they came from is still loaded; otherwise the next
+  scan finds them.
 - Files are never permanently deleted by the app.
 
 ## 9. Platform and non-functional

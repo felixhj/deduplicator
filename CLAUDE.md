@@ -47,9 +47,12 @@ The code is split into three layers. Keep the boundaries strict.
    SwiftUI/AppKit UI and the player, and ties the other two together. It
    depends on the `DedupCore` and `DedupScanner` products. The results table is
    an `NSTableView` (see `App/Results/Table/`). The player (`App/Player/`)
-   plays through `AVAudioPlayer`. Tag writing (phase 8) goes through
-   `TagLibFile.write`. `AppTests/` holds tests hosted in the app, for the
-   models, the table and the player. The player tests play silent files.
+   plays through `AVAudioPlayer`. `App/Removal/` runs removal, undo and
+   auto-select; every file it moves goes through `RemovalExecutor`. Tag
+   writing (phase 8) goes through `TagLibFile.write`. `AppTests/` holds tests
+   hosted in the app, for the models, the table, the player and removal. The
+   player tests play silent files, and the removal tests move real files
+   within their own temporary folder, which also stands in for the Bin.
 
 ## Conventions
 
