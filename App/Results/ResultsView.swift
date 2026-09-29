@@ -31,6 +31,14 @@ struct ResultsView: View {
         .searchable(text: $results.filter.text, placement: .toolbar, prompt: "Filter")
         .toolbar {
             ToolbarItemGroup {
+                Button("Auto-Select", systemImage: "wand.and.stars") { results.isAutoSelecting = true }
+                    .disabled(!library.canAutoSelect)
+                    .help("Keep the best copy in each group and mark the others for removal")
+                Button("Remove", systemImage: "trash") { library.removal.isConfirmingRemoval = true }
+                    .disabled(!library.canRemove)
+                    .help("Remove the marked copies")
+            }
+            ToolbarItemGroup {
                 ConfidenceMenu(minimum: $results.filter.minimumConfidence)
                 OrderMenu(order: $results.order)
                 ColumnsMenu(results: results)
@@ -157,6 +165,13 @@ private struct ResultsStatusBar: View {
                 Text(counts(results))
             }
             Spacer()
+            if let message = library.removal.lastRemoval {
+                Text(message)
+                if library.canUndoRemoval {
+                    Button("Undo") { library.removal.isUndoing = true }
+                        .buttonStyle(.link)
+                }
+            }
             if !results.marked.isEmpty {
                 Text("\(results.marked.count.formatted()) marked for removal (\(TrackColumn.formatSize(results.markedSize)))")
             }

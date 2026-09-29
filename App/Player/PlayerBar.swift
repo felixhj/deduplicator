@@ -57,7 +57,7 @@ private struct NowPlayingLabel: View {
                     Label(failure, systemImage: "exclamationmark.triangle.fill")
                         .foregroundStyle(.orange)
                 } else {
-                    Text(details(of: track))
+                    Text(track.copySummary)
                         .foregroundStyle(.secondary)
                 }
             } else {
@@ -69,14 +69,6 @@ private struct NowPlayingLabel: View {
         }
         .lineLimit(1)
         .help(track?.url.path(percentEncoded: false) ?? "")
-    }
-
-    /// "FLAC · 1000 kbps · Strings of Life.flac".
-    private func details(of track: Track) -> String {
-        [TrackColumn.format, .bitrate, .fileName]
-            .map { $0.text(for: track) }
-            .filter { !$0.isEmpty }
-            .joined(separator: " · ")
     }
 }
 

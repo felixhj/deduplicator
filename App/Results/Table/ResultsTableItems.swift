@@ -60,4 +60,12 @@ extension Track {
         case (true, true): url.lastPathComponent
         }
     }
+
+    /// "FLAC · 1000 kbps · Strings of Life.flac": what tells copies apart.
+    var copySummary: String {
+        [TrackColumn.format, .bitrate, .fileName]
+            .map { $0.text(for: self) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " · ")
+    }
 }

@@ -6,6 +6,8 @@ struct ContentView: View {
 
     var body: some View {
         @Bindable var library = library
+        @Bindable var removal = library.removal
+        @Bindable var results = library.results
         NavigationSplitView {
             FolderList()
                 .navigationSplitViewColumnWidth(min: 200, ideal: 240)
@@ -27,6 +29,16 @@ struct ContentView: View {
         // Here rather than on the sidebar, which may be collapsed.
         .fileImporter(isPresented: $library.isChoosingFolders, allowedContentTypes: [.folder], allowsMultipleSelection: true) { result in
             if case .success(let urls) = result { library.addFolders(urls) }
+        }
+        // Here too, so the menu commands work whatever the window shows.
+        .sheet(isPresented: $removal.isConfirmingRemoval) {
+            RemoveSheet().environment(library)
+        }
+        .sheet(isPresented: $removal.isUndoing) {
+            UndoSheet().environment(library)
+        }
+        .sheet(isPresented: $results.isAutoSelecting) {
+            AutoSelectSheet().environment(library)
         }
     }
 
