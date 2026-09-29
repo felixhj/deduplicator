@@ -7,6 +7,7 @@ struct ResultsView: View {
     @Environment(LibraryModel.self) private var library
     let summary: ScanSummary
     @AppStorage("showsMatchSettings") private var showsSettings = true
+    @FocusState private var isFilterFocused: Bool
 
     var body: some View {
         @Bindable var results = library.results
@@ -29,6 +30,8 @@ struct ResultsView: View {
         // Nothing should play on with no way to stop it, as when the window closes.
         .onDisappear { library.player.pause() }
         .searchable(text: $results.filter.text, placement: .toolbar, prompt: "Filter")
+        .searchFocused($isFilterFocused)
+        .onChange(of: results.filterFocusRequests) { isFilterFocused = true }
         .toolbar {
             ToolbarItemGroup {
                 Button("Auto-Select", systemImage: "wand.and.stars") { results.isAutoSelecting = true }
@@ -49,7 +52,7 @@ struct ResultsView: View {
             }
         }
         .inspector(isPresented: $showsSettings) {
-            MatchSettingsView(criteria: $results.criteria)
+            MatchSettingsView(criteria: $results.criteria, presets: $results.savedPresets)
                 .inspectorColumnWidth(min: 300, ideal: 340, max: 460)
         }
     }

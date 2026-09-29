@@ -9,6 +9,9 @@ import Observation
 @MainActor
 @Observable
 final class TagWriter {
+    /// True while a file is being written, which quitting waits for.
+    private(set) var isWriting = false
+
     @ObservationIgnored private let results: ResultsModel
     @ObservationIgnored private let player: PlayerModel
     @ObservationIgnored private let logURL: URL?
@@ -44,6 +47,8 @@ final class TagWriter {
         if player.track?.id == destination.id {
             player.unload()
         }
+        isWriting = true
+        defer { isWriting = false }
         let updated = try await Task.detached {
             try TagLibFile.write(changes, to: destination.url)
             return AudioFileReader().reread(destination).track

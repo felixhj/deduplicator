@@ -33,6 +33,8 @@ final class ResultsTableController: NSObject {
     /// The tick box and ▶ columns come first and stay there.
     static let fixedColumnCount = 2
     static let headerHeight: CGFloat = 26
+    /// How far ← and → move the copy in the player.
+    static let skipSeconds = 10.0
 
     init(model: ResultsModel, player: PlayerModel) {
         self.model = model
@@ -257,6 +259,11 @@ final class ResultsTableController: NSObject {
             }
         }
         guard modifiers.isEmpty else { return false }
+        switch event.specialKey {
+        case .leftArrow where player.track != nil: player.skip(by: -Self.skipSeconds); return true
+        case .rightArrow where player.track != nil: player.skip(by: Self.skipSeconds); return true
+        default: break
+        }
         switch event.charactersIgnoringModifiers?.lowercased() {
         case " ": togglePlayback(); return true
         case "d": markSelection(true); return true

@@ -62,7 +62,7 @@ struct SnapshotTests {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 360, height: 1500), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.appearance = NSAppearance(named: appearance)
-        let host = NSHostingView(rootView: MatchSettingsView(criteria: .constant(.djLibrary)))
+        let host = NSHostingView(rootView: MatchSettingsView(criteria: .constant(.djLibrary), presets: .constant([])))
         window.contentView = host
         host.layoutSubtreeIfNeeded()
         try await Task.sleep(for: .milliseconds(500))
@@ -101,6 +101,17 @@ struct SnapshotTests {
         try await waitForMatching(library.results)
         library.results.setMarked([1], true)
         try await snapshot(CopyTagsSheet(request: TagCopyRequest(source: 1)).environment(library), as: "copy-tags-\(name)", appearance: appearance)
+    }
+
+    @Test func keyboardShortcuts() async throws {
+        try await snapshot(ShortcutsView(), as: "shortcuts", appearance: .darkAqua)
+    }
+
+    @Test func matchSettingsWithASavedPreset() async throws {
+        var criteria = MatchCriteria.standard
+        criteria.durationTolerance = 9
+        let view = MatchSettingsView(criteria: .constant(criteria), presets: .constant([SavedPreset(name: "Nine seconds", criteria: criteria)]))
+        try await snapshot(view.frame(width: 340, height: 220), as: "saved-preset", appearance: .aqua)
     }
 
     @Test func removalReport() async throws {

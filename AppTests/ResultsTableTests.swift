@@ -316,6 +316,22 @@ extension ResultsTableTests {
         #expect(playCell(table, row: 5)?.symbolName == "speaker.fill")
     }
 
+    @Test func leftAndRightSkipThroughTheCopyInThePlayer() async throws {
+        let (_, table) = try await makeTable(playable: true)
+        let tableView = table.tableView
+        let left = String(Character(UnicodeScalar(NSLeftArrowFunctionKey)!))
+        let right = String(Character(UnicodeScalar(NSRightArrowFunctionKey)!))
+        tableView.keyDown(with: keyEvent(right, keyCode: 124))
+        #expect(table.player.track == nil, "With nothing in the player, the keys do nothing")
+
+        tableView.selectRowIndexes([1], byExtendingSelection: false)
+        table.player.seek(to: 1)
+        tableView.keyDown(with: keyEvent(left, keyCode: 123))
+        #expect(table.player.position == 0)
+        tableView.keyDown(with: keyEvent(right, keyCode: 124))
+        #expect(table.player.position == 2, "Up to the end of the two-second copy")
+    }
+
     @Test func whilePlayingTheSelectionTakesOver() async throws {
         let (_, table) = try await makeTable(playable: true)
         let player = table.player

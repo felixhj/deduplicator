@@ -126,6 +126,11 @@ final class PlayerModel {
         if isPlaying { pause() } else { play() }
     }
 
+    /// Moves `seconds` forward, or back when negative, from where the copy is now.
+    func skip(by seconds: Double) {
+        seek(to: currentPosition + seconds)
+    }
+
     /// Moves to `seconds` from the start, playing or not.
     func seek(to seconds: Double) {
         guard track != nil else { return }

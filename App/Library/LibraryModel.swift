@@ -78,6 +78,14 @@ final class LibraryModel {
         !isScanning && !removal.isBusy && !isShowingSheet && results.selection.count == 1
     }
 
+    /// A scan has finished, so the results are showing.
+    var hasResults: Bool {
+        if case .finished = state { true } else { false }
+    }
+
+    /// Files are being moved or written, which quitting mustn't interrupt.
+    var isChangingFiles: Bool { removal.isBusy || tagWriter.isWriting }
+
     /// Menu commands still work while a sheet is up, and a window shows one
     /// sheet at a time, so commands that open one, or change what one shows, wait.
     var isShowingSheet: Bool {
