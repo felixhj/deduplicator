@@ -96,7 +96,7 @@ Title and artist each get a strictness level (a Swinsian-style model):
 | Identical | raw strings equal, with no normalisation |
 | Same | normalised strings equal |
 | Similar | normalised similarity ≥ threshold (default 90%) |
-| Fuzzy | normalised similarity ≥ lower threshold (default 75%), token-order-insensitive |
+| Fuzzy | normalised similarity ≥ lower threshold (default 80%), token-order-insensitive |
 | Ignore | field isn't compared |
 
 Similarity uses the maximum of Jaro-Winkler and a token-set ratio, so word

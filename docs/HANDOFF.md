@@ -1,7 +1,7 @@
 # Handoff
 
 Read this, then `CLAUDE.md`, `docs/SPEC.md` and `docs/ROADMAP.md`. Everything
-is on `main`, at version 1.0.0 (2026-09-29).
+is on `main`, at version 1.0.1 (2026-09-30).
 
 ## Where we are
 
@@ -17,22 +17,17 @@ is on `main`, at version 1.0.0 (2026-09-29).
   status bar, and a tick to confirm in the remove sheet), Help > Deduplicator
   Help, an update check against GitHub releases, the MIT licence, and
   `scripts/build-release.sh`.
-- The GitHub repository was still private at 1.0.0, so the update check can't
+- 1.0.1 fixes the window being cut off at both sides when narrowed, and the
+  spec now gives Fuzzy's default as 80%, as the code always had it.
+- The GitHub repository was still private at 1.0.1, so the update check can't
   see its releases yet; it stays quiet at launch until it can.
 - Nothing has been built on Linux since TagLib was added.
 
 ## Do this first
 
 1. If version 1.0.0 isn't published yet: see "Making a release" below.
-2. Ask about the open questions below, and work through anything the user
-   finds. Keep `docs/TESTING.md` up to date with every change.
-
-## Open questions for the user
-
-- SPEC §3.2 says the Fuzzy level defaults to 75%, but the code has used 80%
-  since phase 2 (`MatchLevel.defaultThreshold`). Jaro-Winkler scores unlike
-  short strings generously, so 80% is safer; the slider changes it either
-  way. One of the two should be changed to match.
+2. Work through anything the user finds. Keep `docs/TESTING.md` up to date
+   with every change.
 
 ## Decisions already made with the user (don't re-ask)
 
@@ -247,6 +242,14 @@ is on `main`, at version 1.0.0 (2026-09-29).
   points each side of its frame.
 - A group header row is as wide as every column together, about 1,600 points
   by default, so anything at its far end is usually scrolled out of view.
+- A fixed `.frame(minWidth:)` on the window's root view replaces the minimum
+  SwiftUI works out from the columns. The window could then get narrower than
+  they need, and SwiftUI laid them out wider than the window, cut off at both
+  sides. `mainWindowSizing()` sets only a minimum height, and
+  `WindowLayoutTests` narrows the real window to check. With macOS 26's
+  floating sidebar, SwiftUI counts the sidebar's width twice in that minimum,
+  so the table's column should stay able to get narrow: the player bar hides
+  the copy's name below 520 points.
 
 ## Making a release
 

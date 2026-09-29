@@ -17,6 +17,7 @@ checked on a Mac.
 | 8 | Basic tag editing: copy tags to the keeper via TagLib | ✅ done. The comparison logic is tested anywhere, re-reading a file with `swift test` on a Mac, and writing real files by app tests in Xcode |
 | 9 | Polish: settings persistence, presets UI, keyboard shortcuts, app icon | ✅ done. Saved presets and remembered settings are tested by app tests in Xcode; the icon, menus and windows by looking |
 | 1.0 | Fixes from testing by hand (dragging and fitting columns, visible every-copy warnings, left-aligned headings), a help window, an update check, the MIT licence and a release script | ✅ done |
+| 1.0.1 | The window no longer cuts its columns off when narrowed | ✅ done |
 
 ## Key technical choices
 

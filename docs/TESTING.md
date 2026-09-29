@@ -91,6 +91,13 @@ Where the app keeps its data, to inspect it or start again:
       right after the title, even with the table scrolled or narrow. The
       status bar says so too, and its Show link selects that group.
 - [ ] Light and dark mode both look right.
+- [ ] Make the window as narrow as it goes, with and without the folder list
+      and the match settings: nothing is cut off at either side, and the
+      player bar drops the copy's name before anything else.
+- [ ] In the narrowest window, drag the folder list's divider: every column
+      stays inside the window.
+- [ ] In the narrowest window without the match settings, show them (⌥⌘I):
+      the window widens to fit them.
 
 ## Player
 
@@ -211,11 +218,11 @@ Use the test copy of your music for these too.
 
 - [ ] Help > Deduplicator Help (⌘?) opens the guide, and Help > Keyboard
       Shortcuts the list of shortcuts.
-- [ ] Deduplicator > About Deduplicator shows version 1.0.0 and the MIT
+- [ ] Deduplicator > About Deduplicator shows the version and the MIT
       Licence.
 - [ ] Deduplicator > Check for Updates… says it couldn't check while the
       repository is private or has no release, and that you're up to date once
-      version 1.0.0 is published.
+      the version you're running is published.
 - [ ] Once a later release exists, opening this version offers to download it,
       and Skip This Version stops it asking about that release. The switch in
       Settings > Updates stops the check at launch.
