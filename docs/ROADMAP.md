@@ -12,7 +12,7 @@ checked on a Mac.
 | 3 | `DedupCore` selection: auto-select keeper rules and a removal plan (Bin or mirrored-folder destinations), with tests | ✅ done, tests pass on macOS |
 | 4 | App shell: `project.yml` (XcodeGen), TagLib integration, concurrent folder scanner, decoded duration via AVFoundation, scan cache | ✅ done, built and run in Xcode |
 | 5 | Results UI: flat banded table, collapsible groups, dynamic tag columns, diff highlighting, match settings panel | ✅ done. The results logic is tested anywhere; the table and models by app tests in Xcode |
-| 6 | Player: AVPlayer transport, A/B at the same position, waveform | ❌ Mac |
+| 6 | Player: transport, A/B at the same position, waveform | ✅ done. The waveform logic is tested anywhere, the waveform reader with `swift test` on a Mac, the player and table by app tests in Xcode |
 | 7 | Removal: confirm sheet, Bin or mirrored move, JSON log, undo; auto-select keepers with editable rules and a preview (SPEC §6) | ❌ Mac (the plan and keeper logic are tested in phase 3) |
 | 8 | Basic tag editing: copy tags to the keeper via TagLib | ❌ Mac |
 | 9 | Polish: settings persistence, presets UI, keyboard shortcuts, app icon | ❌ Mac |
@@ -34,3 +34,9 @@ checked on a Mac.
   (a header row per group, then its copies) and handles collapsing itself,
   because an `NSOutlineView` took over a second to expand 20,000 groups. With
   50,000 tracks, loading takes under 0.1 s and filtering about 0.1 s.
+- **Playback** uses `AVAudioPlayer` rather than `AVPlayer`. It opens a local
+  file synchronously in about 7 ms, so switching copies takes 20–30 ms and the
+  position carries over exactly, with no waiting for a player item to become
+  ready.
+- **Waveforms** are decoded with `AVAudioFile` and measured slice by slice with
+  vDSP. Five minutes of FLAC or AAC takes about 0.15 s, even in a debug build.

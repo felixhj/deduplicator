@@ -1,28 +1,34 @@
 # Handoff
 
-Read this, then `CLAUDE.md`, `docs/SPEC.md` and `docs/ROADMAP.md`. Phase 5
-is on branch `claude/phase-5-results-ui`, committed locally but not pushed
-(2026-09-29). Phases 0–4 are on `main`.
+Read this, then `CLAUDE.md`, `docs/SPEC.md` and `docs/ROADMAP.md`. Phase 6
+is on branch `claude/phase-6-player`, committed locally but not pushed
+(2026-09-29). Phases 0–5 are on `main`.
 
 ## Where we are
 
-- Phases 0–5 are done. The app builds in Xcode 27 (Swift 6.4) with no
-  warnings, launches, and every test passes: the package tests (`swift test`
-  or `scripts/test.sh`) and the app tests in `AppTests/` (⌘U in Xcode).
+- Phases 0–6 are done. The app builds in Xcode 27 (Swift 6.4) with no
+  warnings, and every test passes: the package tests (`swift test` or
+  `scripts/test.sh`) and the app tests in `AppTests/` (⌘U in Xcode).
 - Phase 5 added the results screen: the banded table with group headers,
   collapsing, tick boxes, highlighted differences, any tag as a column, header
   sorting, a text and confidence filter, the `k`, `d` and ⌘↓ keys, and the
   match settings inspector.
-- Nobody has scanned a real music library with the app yet. Scans of
-  generated audio files work, in the package tests and in an app test.
+- Phase 6 added the player under the table: play, pause, a waveform to seek
+  with, A/B switching between copies at the same position, the ▶ column,
+  space and double-click to play, and a Settings window with the one player
+  setting.
+- The player has only played generated, silent files, in the app tests. The
+  snapshots show the player bar and ▶ column, but nobody has listened to real
+  music with it, clicked the ▶ buttons or dragged along the waveform.
 - Nothing has been built on Linux since TagLib was added.
 
 ## Do this first
 
-1. Run the app on a real music folder. Check that groups make sense, that
-   columns can be added, moved and resized and are remembered, and that the
-   match settings change the groups.
-2. Then start phase 6 (the player).
+1. Run the app on a real music folder. Listen to a group: select a copy,
+   press space, then click the other copies while it plays. Check the switch
+   is quick and keeps the position, that dragging along the waveform seeks,
+   and that the ▶ button appears on the row under the pointer.
+2. Then start phase 7 (removal and auto-select).
 
 ## Decisions already made with the user (don't re-ask)
 
@@ -39,7 +45,8 @@ is on branch `claude/phase-5-results-ui`, committed locally but not pushed
   can be resized, reordered and hidden, **any tag** can be added as a column,
   and values that differ within a group are highlighted.
 - Player: A/B playback that keeps the same position when switching copies,
-  plus a **waveform**.
+  plus a **waveform**. Selecting a copy on its own puts it in the player;
+  while playing, the selection takes over playback.
 - v1 extras: **undo of the last removal plus a JSON log**, **auto-select
   keepers**, **waveform**, and **basic tag editing** (copy chosen tag values
   from one copy to the keeper, with before/after confirmation).
@@ -65,6 +72,9 @@ is on branch `claude/phase-5-results-ui`, committed locally but not pushed
 - `Results/`: `TrackColumn` (each column's title, cell text and sort key),
   `GroupDifferences` (which copies differ), `ResultFilter`, `SearchIndex`,
   `GroupOrder` and `GroupArrangement`.
+- `Waveform/`: `Waveform`, the peak and average level of each slice of a
+  track, kept to 1/255 so it saves and loads exactly, and resampled to the
+  width being drawn.
 
 ## Scanner map (`Sources/DedupScanner`, `Sources/CTagLib`)
 
@@ -95,6 +105,11 @@ is on branch `claude/phase-5-results-ui`, committed locally but not pushed
 - On an Apple silicon Mac, with 20,000 small MP3s already in the disk cache,
   the first scan took 1.6 s and a rescan 0.4 s. The cache is about 0.9 KB per
   track.
+- `WaveformReader.read` (macOS only): decodes a file with `AVAudioFile` and
+  measures 1,000 slices with vDSP. It stops as soon as its task is cancelled.
+- `WaveformCache`: one small JSON file per audio file, named by a hash of the
+  path, size and modification date, with those stored inside to check. About
+  3 KB each. Nothing prunes it yet.
 
 ## App map (`App/`)
 
@@ -110,16 +125,26 @@ is on branch `claude/phase-5-results-ui`, committed locally but not pushed
 - `Results/Table/`: `ResultsTableController` drives a flat `ResultsTableView`
   (an `NSTableView`): a full-width `GroupHeaderView` row per group, then a row
   per copy, painted by `BandRowView`. It rebuilds rows when the model's
-  `revision` changes and only refreshes tick boxes when `marksRevision` does.
-  `ResultsTable` puts it in SwiftUI.
-- `Results/ResultsView`: the table, the toolbar (confidence, order, columns,
-  settings), the search field, the status bar and the scan report popover.
-  `Results/MatchSettingsView` is the inspector.
+  `revision` changes and only refreshes tick boxes when `marksRevision` does,
+  and the ▶ cells (`PlayCellView`) when the player's `nowPlaying` does. It
+  hands a copy selected on its own to the player. `ResultsTableView` tracks
+  the row under the pointer, for the ▶ button. `ResultsTable` puts it in
+  SwiftUI.
+- `Results/ResultsView`: the table, the player bar, the toolbar (confidence,
+  order, columns, settings), the search field, the status bar and the scan
+  report popover. `Results/MatchSettingsView` is the inspector.
+- `Player/PlayerModel` (`@MainActor`, `@Observable`, owned by `LibraryModel`):
+  the copy in the player, `AVAudioPlayer` playback, the position (followed 20
+  times a second while playing), and the waveform, drawn by a detached task
+  that then draws the group's other copies into the cache. `select` is what
+  the table calls; `play`, `pause`, `seek` and `unload` do the rest.
+- `Player/PlayerBar` and `WaveformView`: the bar under the table. Only
+  `PlayerTimeline` reads the position, so only it redraws while playing.
 - `Views/`: `ContentView` (split view, Scan button, folder picker),
-  `FolderList` (add, remove, drop) and `ScanViews` (before the first scan,
-  progress, and the scan report).
+  `FolderList` (add, remove, drop), `ScanViews` (before the first scan,
+  progress, and the scan report) and `SettingsView` (the Settings window).
 - `AppFolders`: `~/Library/Application Support/Deduplicator`, which the removal
-  log will share.
+  log will share, and `~/Library/Caches/Deduplicator/Waveforms`.
 
 ## Things learned the hard way
 
@@ -142,11 +167,21 @@ is on branch `claude/phase-5-results-ui`, committed locally but not pushed
 - Xcode 27's SwiftPM builds with Swift Build, whose output layout differs from
   the older native build system's. `scripts/check-app.sh` handles both.
 - Tests that make an `NSWindow` must set `isReleasedWhenClosed = false`.
+- `AVAudioPlayer` opens a file in about 7 ms and seeks exactly, and rewinds to
+  0 when it plays to the end. Stopping the old copy before starting the new
+  one switches in 20–30 ms; pausing it instead took twice as long. `AVPlayer`
+  would have meant waiting for each item to become ready before seeking.
+- Overriding `scrollWheel` in the table would turn off responsive scrolling,
+  so the ▶ hover follows scrolling through the clip view's bounds
+  notifications instead.
+- Hovering reads the real pointer, so it only counts in a visible window.
+  Otherwise a test's off-screen window could pick up wherever the pointer is.
 
-## Next: phase 6 (player)
+## Next: phase 7 (removal and auto-select)
 
-See `docs/ROADMAP.md` and SPEC §5: play, pause and seek with `AVPlayer`, a
-waveform generated in the background and cached, and switching between copies
-in a group at the same position. Space plays or pauses in the table, and the
-▶ column from SPEC §4 comes with it. `ResultsModel.selection` already follows
-the table's selection. Then phase 7 (removal and auto-select).
+See `docs/ROADMAP.md` and SPEC §6 and §8: a confirm sheet, then the Bin or a
+mirrored move through `RemovalExecutor`, the JSON log, undo of the last
+removal, and auto-select with editable rules and a preview. The planning and
+keeper logic in `DedupCore/Selection` is done and tested. Removal settings can
+join the player's in `SettingsView`. The player should let go of a copy that's
+removed while it's in the player. Then phase 8 (tag copying).

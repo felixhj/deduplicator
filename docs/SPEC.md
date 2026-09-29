@@ -154,6 +154,8 @@ every member matches the group's anchor (configurable).
   - default columns: ✓ (remove), ▶, track #, title, artist, album artist,
     album, year, comment, duration, bitrate, format, size, path. More built-in
     columns: genre, disc, sample rate, bit depth, channels, modified, file name.
+  - ✓ and ▶ always come first. ▶ shows a speaker on the copy in the player,
+    and a play button on the row under the pointer.
   - columns can be resized, reordered and hidden, and the layout persists
   - **any tag** found in the scanned files can be added as a column. The column
     picker (right-click the column headings, or the Columns toolbar menu) lists
@@ -167,8 +169,9 @@ every member matches the group's anchor (configurable).
 - Sorting groups by confidence (the default), by number of copies, or by
   clicking a column heading, which also orders the copies within each group.
 - Keyboard: ↑/↓ moves between rows, space plays or pauses, `k` keeps, `d` marks
-  for deletion, and ⌘↓ and ⌘↑ go to the next and previous group. The
-  right-click menu has Mark for Removal, Keep and Show in Finder.
+  for deletion, and ⌘↓ and ⌘↑ go to the next and previous group. Double-clicking
+  a row plays it. The right-click menu has Mark for Removal, Keep and Show in
+  Finder.
 - The match settings sit in an inspector beside the table, starting from the
   Standard, DJ Library or Loose preset. Changes apply as you make them, after a
   short pause.
@@ -178,11 +181,27 @@ every member matches the group's anchor (configurable).
 
 ## 5. Player
 
-- Play, pause and seek. The scrubber shows position and duration.
-- **Waveform** for the current track, generated in the background and cached.
-- Clicking another row in the same group switches to it **at the same
-  position**, for quick A/B comparison. A setting switches this off.
-- "Reveal in Finder".
+- The player sits under the table. It shows the copy in it (the track, then
+  the format, bitrate and file name that tell copies apart), play and pause,
+  the position and duration, and Show in Finder.
+- The **waveform** is the scrubber: the part already played is in the accent
+  colour, and clicking or dragging moves the position. It shows the peak and
+  the average level (root mean square) of 1,000 equal slices of the decoded
+  audio. It's drawn in the background and cached in
+  `~/Library/Caches/Deduplicator/Waveforms`, keyed by path, size and mtime.
+  After a copy's waveform, the other copies' in its group are drawn too, so
+  switching to one shows its waveform at once.
+- The player follows the table: a copy selected on its own goes into the
+  player. Several selected copies leave it alone, so selecting copies to mark
+  them doesn't interrupt the one playing.
+- While a copy plays, selecting another copy of the same track switches to it
+  **at the same position**, for quick A/B comparison. Settings (Player) can
+  switch this off. Selecting a copy of another track plays it from the start.
+- Space plays or pauses. Double-clicking a row, or clicking its ▶ button, plays
+  it. Playing to the end stops and goes back to the start.
+- A copy that can't be played says why: its file has moved or been deleted
+  since the scan, or Core Audio can't play it.
+- Starting a scan empties the player. Closing the window pauses it.
 
 ## 6. Choosing keepers
 
