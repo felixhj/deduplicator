@@ -222,12 +222,23 @@ every member matches the group's anchor (configurable).
 
 ## 7. Basic tag editing
 
-- In a group, the user can **copy chosen tag values from any copy to the
-  keeper**. For example, keep the FLAC but take the MP3's better comment and
-  year.
-- Writes go through TagLib. They are only made to the file the user chose, and
-  only after a confirmation that shows the before and after values.
-- There is no free-form tag editor in v1.
+- In a group, the user can **copy chosen tag values from any copy to another**,
+  usually the keeper. For example, keep the FLAC but take the MP3's better
+  comment and year. Right-click a copy > Copy Tags from This Copy…, or select
+  one copy and choose Edit > Copy Tags….
+- The sheet lists the tags that would change: each one's value in the
+  destination now, and what it becomes. The destination starts as the only
+  copy not marked for removal. Tags the destination lacks are ticked when they
+  describe the music (title, date, comment, BPM, key and so on); tags about
+  the file, such as encoder settings or loudness, never are.
+- Writes go through TagLib. They are only made to the destination file, and
+  only after a review step that shows each value before and after. The file
+  is read again afterwards, so the results show the new values; matching
+  uses them the next time it runs. The player lets go of the file first.
+- Every write is logged in
+  `~/Library/Application Support/Deduplicator/TagEditLog.json`, with the
+  values before and after, so a change can be put right by hand.
+- There is no free-form tag editor in v1, and cover art isn't copied.
 
 ## 8. Removal
 
