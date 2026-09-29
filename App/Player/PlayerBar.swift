@@ -7,6 +7,13 @@ import SwiftUI
 /// to move it.
 struct PlayerBar: View {
     let player: PlayerModel
+    /// The bar's width, which decides whether there's room for the copy's name.
+    @State private var width: CGFloat = 1000
+
+    /// Narrower than this, the copy's name makes way for the waveform, so the
+    /// table's column can get narrow. It's wider than the bar needs with the
+    /// name, so showing the name never makes the bar too wide for itself.
+    static let widthForName: CGFloat = 520
 
     var body: some View {
         HStack(spacing: 12) {
@@ -22,8 +29,10 @@ struct PlayerBar: View {
             .help(player.isPlaying ? "Pause (Space)" : "Play (Space)")
             .accessibilityLabel(player.isPlaying ? "Pause" : "Play")
 
-            NowPlayingLabel(track: player.track, failure: player.failure)
-                .frame(width: 250, alignment: .leading)
+            if width >= Self.widthForName {
+                NowPlayingLabel(track: player.track, failure: player.failure)
+                    .frame(minWidth: 120, idealWidth: 250, maxWidth: 250, alignment: .leading)
+            }
 
             PlayerTimeline(player: player)
 
@@ -40,6 +49,7 @@ struct PlayerBar: View {
         .padding(.horizontal, 12)
         .frame(height: 50)
         .background(Color(nsColor: .windowBackgroundColor))
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
     }
 }
 
@@ -93,6 +103,7 @@ private struct PlayerTimeline: View {
                         ProgressView().controlSize(.small)
                     }
                 }
+                .frame(minWidth: 60)
                 .frame(height: 34)
                 .contentShape(Rectangle())
                 .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = max($0, 1) }

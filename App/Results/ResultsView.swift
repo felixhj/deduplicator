@@ -167,8 +167,9 @@ private struct ResultsStatusBar: View {
                 Text("Finding duplicates…")
             } else {
                 Text(counts(results))
+                    .layoutPriority(1)
             }
-            Spacer()
+            Spacer(minLength: 0)
             if let message = library.removal.lastRemoval {
                 Text(message)
                 if library.canUndoRemoval {
@@ -190,6 +191,8 @@ private struct ResultsStatusBar: View {
         .font(.callout)
         .foregroundStyle(.secondary)
         .monospacedDigit()
+        // One line, whatever the width: text is shortened rather than wrapped.
+        .lineLimit(1)
         .padding(.horizontal, 10)
         .padding(.vertical, 5)
         .background(Color(nsColor: .windowBackgroundColor))

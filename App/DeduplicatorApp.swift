@@ -13,7 +13,7 @@ struct DeduplicatorApp: App {
             ContentView()
                 .environment(library)
                 .environment(updates)
-                .frame(minWidth: 720, minHeight: 420)
+                .mainWindowSizing()
                 .onAppear { appDelegate.isChangingFiles = { [library] in library.isChangingFiles } }
         }
         .commands {

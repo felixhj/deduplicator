@@ -65,3 +65,13 @@ struct ContentView: View {
         }
     }
 }
+
+extension View {
+    /// The main window takes its minimum size from its content: the height
+    /// set here, and the width its columns need. A fixed minimum width would
+    /// let the window get narrower than the columns, and SwiftUI would then
+    /// lay them out wider than the window, cut off at both sides.
+    func mainWindowSizing() -> some View {
+        frame(minHeight: 420)
+    }
+}

@@ -103,6 +103,32 @@ struct SnapshotTests {
         try await snapshot(CopyTagsSheet(request: TagCopyRequest(source: 1)).environment(library), as: "copy-tags-\(name)", appearance: appearance)
     }
 
+    /// The whole window, made as narrow as it goes, with a copy in the player.
+    @Test(arguments: [true, false])
+    func narrowestWindow(showsMatchSettings: Bool) async throws {
+        let directory = URL(filePath: ProcessInfo.processInfo.environment["SNAPSHOT_DIR"]!, directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        storage.defaults.set(showsMatchSettings, forKey: "showsMatchSettings")
+        _ = try Fixtures.playableLibrary(in: folder.url, seconds: 2)
+        let library = LibraryModel(defaults: storage.defaults, cacheURL: nil, waveformFolder: nil, removalLog: nil, tagLog: nil)
+        library.addFolders([folder.url])
+        library.scan()
+        try await waitUntil("the scan") { library.hasResults }
+        try await waitForMatching(library.results)
+        library.results.setMarked([3, 4], true)
+        library.player.select(try #require(library.results.tracks[1]), copies: library.results.copies(inGroupOf: 1))
+        let updates = UpdateChecker(currentVersion: "1.0.0", defaults: storage.defaults) { throw UpdateChecker.Failure.status(404) }
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1400, height: 520), styleMask: [.titled, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.appearance = NSAppearance(named: .darkAqua)
+        window.contentViewController = NSHostingController(rootView: ContentView().environment(library).environment(updates).defaultAppStorage(storage.defaults).mainWindowSizing())
+        window.setContentSize(NSSize(width: 400, height: 520))
+        try await Task.sleep(for: .milliseconds(800))
+        window.contentView?.layoutSubtreeIfNeeded()
+        try save(try #require(window.contentView?.superview), as: "narrowest-\(showsMatchSettings ? "with" : "without")-settings", in: directory)
+        window.close()
+    }
+
     @Test func help() async throws {
         try await snapshot(HelpView(), as: "help", appearance: .aqua)
     }
