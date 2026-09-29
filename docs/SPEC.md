@@ -1,6 +1,6 @@
 # Deduplicator — Product Spec
 
-Status: **draft**. Open questions are marked ❓ and are tracked at the bottom.
+Status: **agreed v1 scope** (planning round 1, 2026-09-29). Items marked ⏳ are deferred to after v1.
 
 ## 1. Goal
 
@@ -10,16 +10,20 @@ user choose which copies to remove, and remove them safely.
 
 ## 2. Input
 
-- The user adds one or more root folders, which are scanned recursively.
-- Supported formats ❓: MP3, AAC/M4A, ALAC, FLAC, AIFF, WAV, possibly
-  OGG/Opus.
+- The user adds one or more root folders, which are scanned recursively. Only
+  folders are supported: there is no Music.app, Swinsian or Rekordbox import in v1.
+- Supported formats: MP3, AAC/M4A, ALAC, FLAC, AIFF, WAV. Tags are read with
+  **TagLib**, because AVFoundation handles FLAC and arbitrary ID3 frames
+  poorly. Decoding and playback use AVFoundation, which supports all of these
+  on macOS 15.
 - For each file the app reads:
   - **all tags** present, so any tag can be shown as a column
   - **decoded duration** from the audio stream. The TLEN/length tag is never
     used.
   - file info: path, size, format/codec, bitrate, sample rate, bit depth,
     channels, date modified
-- Scan results are cached, keyed by path, size and mtime, so rescans are fast ❓.
+- Scan results are cached, keyed by path, size and mtime, so rescans are fast.
+  This is required, because the target is **50k+ tracks**.
 
 ## 3. Matching
 
@@ -27,6 +31,11 @@ user choose which copies to remove, and remove them safely.
 
 Before comparison, each field goes through an ordered list of rules. Every
 rule can be switched on or off in the UI, and every rule is unit-tested.
+
+**Default: every stripping rule is OFF.** The user turns on the ones they
+want. Basic folding (case, whitespace) is on by default only at the *Same*
+level and above. Presets such as "DJ library" can switch on a sensible set in
+one click.
 
 **Title rules**
 | Rule | Example |
@@ -41,7 +50,7 @@ rule can be switched on or off in the UI, and every rule is unit-tested.
 | Rule | Example |
 |------|---------|
 | Split featured artists | `A ft. B`, `A feat. B`, `A featuring B`, `A (feat. B)` → primary `A`, featured `{B}` |
-| Split collaborations ❓ | `A & B`, `A x B`, `A vs. B`, `A, B`, `A and B` → set `{A, B}` |
+| Split collaborations | `A & B`, `A x B`, `A vs. B`, `A, B`, `A and B` → set `{A, B}` |
 | Strip "The" prefix | `The Prodigy` = `Prodigy` |
 
 **Both fields**
@@ -57,9 +66,9 @@ rule can be switched on or off in the UI, and every rule is unit-tested.
 stripping `(Carl Craig Remix)` would merge *different recordings*. The bracket
 stripper therefore uses classes:
 
-- *Neutral* versions, stripped by default: Original Mix, Extended Mix, Radio
+- *Neutral* versions, stripped when the rule is on: Original Mix, Extended Mix, Radio
   Edit, Album Version, Remastered, Explicit/Clean, Mono/Stereo, …
-- *Distinct* versions, kept by default: anything with Remix, Dub, VIP, Rework,
+- *Distinct* versions, kept unless the next setting is on: anything with Remix, Dub, VIP, Rework,
   Edit by a named person, Live, Acoustic, Instrumental, …
 - A user setting: **"Treat all versions as the same track"**, which strips
   everything.
@@ -80,8 +89,9 @@ Similarity uses the maximum of Jaro-Winkler and a token-set ratio, so word
 order (`Energy 52 – Cafe del Mar` vs `Cafe del Mar – Energy 52`) and extra
 words matter less.
 
-Artist comparison is **set-aware**: primary artists must match, and featured
-artists are ignored by default ❓.
+Artist comparison is **set-aware**: primary artists must match. When the
+"split featured artists" rule is on, featured artists are ignored; otherwise
+they're part of the compared string.
 
 The user can also add extra fields (album, album artist, year, …) as match
 criteria, with the same levels.
@@ -109,8 +119,8 @@ criteria, with the same levels.
    from the filename (opt-in).
 5. **Confidence score:** each group gets a score and a list of the rules that
    fired, so the user can see *why* the tracks matched.
-6. **Audio fingerprint (later, optional):** a Chromaprint-style fingerprint to
-   confirm or find matches with junk tags ❓.
+6. ⏳ **Audio fingerprint (after v1):** a Chromaprint-style fingerprint to
+   confirm or find matches with junk tags.
 
 ### 3.5 Grouping
 
@@ -120,16 +130,17 @@ every member matches the group's anchor (configurable).
 
 ## 4. Results UI
 
-- A sidebar or list of groups showing count, summary and confidence.
-- Group detail is a table with **one row per file**:
+- **One flat, banded table** (like Swinsian): every file in every duplicate
+  group, with groups separated by a group header row and alternating band
+  colours. Groups can be collapsed. The group header shows the file count, the
+  confidence and why the tracks matched.
+- Columns:
   - default columns: ✓ (remove), ▶, track #, title, artist, album artist,
     album, year, comment, duration, bitrate, format, size, path
-  - columns can be resized, reordered and hidden
+  - columns can be resized, reordered and hidden, and the layout persists
   - **any tag** found in the scanned files can be added as a column (a column
     picker lists every tag key seen)
   - cells whose value differs from the rest of the group are highlighted
-- An alternative flat view has every file in one table, with groups banded by
-  colour and collapsible ❓.
 - Filtering by text and by confidence. Sorting groups.
 - Keyboard: ↑/↓ moves between rows, space plays or pauses, `k` keeps, `d` marks
   for deletion, and ⌘↓ goes to the next group.
@@ -137,9 +148,9 @@ every member matches the group's anchor (configurable).
 ## 5. Player
 
 - Play, pause and seek. The scrubber shows position and duration.
+- **Waveform** for the current track, generated in the background and cached.
 - Clicking another row in the same group switches to it **at the same
-  position**, for quick A/B comparison ❓.
-- Optional waveform view ❓.
+  position**, for quick A/B comparison. A setting switches this off.
 - "Reveal in Finder".
 
 ## 6. Choosing keepers
@@ -151,26 +162,44 @@ every member matches the group's anchor (configurable).
   more tags filled → path contains/doesn't contain X → oldest/newest file.
 - "Auto-select all groups" with a preview of the result.
 
-## 7. Removal
+## 7. Basic tag editing
 
-- The user chooses what happens on **Remove** in Settings or in the confirm
-  sheet:
+- In a group, the user can **copy chosen tag values from any copy to the
+  keeper**. For example, keep the FLAC but take the MP3's better comment and
+  year.
+- Writes go through TagLib. They are only made to the file the user chose, and
+  only after a confirmation that shows the before and after values.
+- There is no free-form tag editor in v1.
+
+## 8. Removal
+
+- The user chooses what happens on **Remove** in Settings, and can change it
+  in the confirm sheet:
   1. **Move to Bin** (`FileManager.trashItem`, so the files can be restored from
      the Bin)
-  2. **Move to folder**: the user picks a folder, and the relative folder
-     structure is kept ❓ to avoid name collisions
+  2. **Move to folder**: the user picks a destination, and the **folder
+     structure is mirrored** relative to the scanned root. For example,
+     `Root/A/B/x.mp3` goes to `Dest/<RootName>/A/B/x.mp3`.
 - A confirm sheet shows the file count and total size.
-- Every operation is written to a log (a CSV or JSON of original path →
-  destination), and **undo** is available for the last operation ❓.
+- Every operation is appended to a JSON log (timestamp, original path,
+  destination), stored in Application Support.
+- **Undo last removal** moves the files back to their original paths. Undo
+  from the Bin uses the destination URL that `trashItem` returns.
 - Files are never permanently deleted by the app.
 
-## 8. Non-functional
+## 9. Platform and non-functional
 
-- Responsive with 50k+ tracks: scanning is concurrent and matching runs in the
-  background with progress and cancel.
-- Tag editing is out of scope for v1 ❓.
+- **macOS 15+**, for personal use: no App Sandbox and no App Store. The project
+  is generated with **XcodeGen** from `project.yml`.
+- Must stay responsive with **50k+ tracks**:
+  - scanning is concurrent (a bounded task group), with progress and cancel
+  - there is a persistent scan cache
+  - matching uses blocking so the number of comparisons stays close to linear,
+    and runs off the main thread with progress and cancel
+  - the table is virtualised (SwiftUI `Table` or an `NSTableView` if needed)
 
-## 9. Open questions
+## 10. Deferred (post-v1)
 
-Tracked in the planning conversation. Resolved answers are folded into the
-sections above.
+- ⏳ Audio fingerprinting
+- ⏳ Importing from the Music.app, Swinsian or Rekordbox libraries
+- ⏳ A full tag editor

@@ -29,8 +29,8 @@ The code is split into two layers. Keep this boundary strict.
 
    It must compile and pass its tests on Linux (`swift test`), so Claude can
    verify it in the cloud container, which has no Xcode.
-2. **`Deduplicator` (the macOS app)** holds the SwiftUI/AppKit UI, folder
-   scanning, tag reading, audio duration measurement, the player and file
+2. **`App/` (the macOS app, built from `project.yml` with XcodeGen)** holds the SwiftUI/AppKit UI, folder
+   scanning, tag reading and writing (TagLib bridge), audio duration measurement, the player and file
    operations (trash or move). It depends on `DedupCore`.
 
 ## Conventions
@@ -40,6 +40,10 @@ The code is split into two layers. Keep this boundary strict.
   rule needs test cases, including cases where it must *not* change the input.
 - Duration always comes from the decoded audio, never from the TLEN or length
   tag.
+- Targets macOS 15+, for personal use with no sandbox. Design for 50k+ tracks:
+  never do O(n²) work without blocking, and keep heavy work off the main actor.
+- Stripping and normalisation rules are **off by default**. Presets switch them
+  on.
 - Destructive file operations go through one service. Nothing is deleted
   permanently: files only go to the Bin or a user-chosen folder. Log every
   operation.
@@ -51,7 +55,7 @@ The code is split into two layers. Keep this boundary strict.
 ```sh
 swift build                 # build everything the host platform supports
 swift test                  # run DedupCore tests (works on Linux and macOS)
-open Package.swift          # open in Xcode (macOS)
+xcodegen && open Deduplicator.xcodeproj   # macOS app
 ```
 
 ## Environment notes for Claude

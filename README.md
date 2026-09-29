@@ -3,7 +3,7 @@
 A native macOS app for finding and removing duplicate music files, by comparing
 tags intelligently instead of by file hash.
 
-> **Status:** pre-alpha. Planning is underway. See [`docs/SPEC.md`](docs/SPEC.md)
+> **Status:** pre-alpha. The v1 scope is agreed. See [`docs/SPEC.md`](docs/SPEC.md)
 > for requirements and [`docs/ROADMAP.md`](docs/ROADMAP.md) for build phases.
 
 ## Why
@@ -38,13 +38,19 @@ each field.
 - **Built-in player** for A/B listening within a group.
 - **Choosing the copy to keep:** pick by hand or with auto-select rules, such
   as highest bitrate, lossless over lossy, or longest.
+- **Waveform view** in the player.
+- **Basic tag copying:** take tag values from one copy and write them to the
+  keeper.
 - **Safe removal:** send the selected files to the Bin, or move them to a folder
-  you choose.
+  you choose, with the folder structure mirrored. Every removal is logged and
+  can be undone.
+- Built for libraries of **50k+ tracks**.
 
 ## Requirements
 
-- macOS (the minimum version is still to be decided; see `docs/SPEC.md`)
+- macOS 15 (Sequoia) or later
 - Xcode 16+ and Swift 6 to build
+- [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`)
 
 ## Building
 
@@ -53,10 +59,11 @@ _To be filled in when the first code lands._
 ## Project layout (planned)
 
 ```
-Package.swift            SwiftPM manifest
+project.yml              XcodeGen spec for the macOS app
+Package.swift            SwiftPM manifest for DedupCore
 Sources/DedupCore/       Platform-independent matching engine (normalisation,
                          similarity, grouping). Unit-tested, and builds on Linux too.
-Sources/Deduplicator/    macOS SwiftUI app: scanning, tag reading, UI, player,
+App/                     macOS SwiftUI app: scanning, TagLib bridge, UI, player,
                          and file operations.
 Tests/DedupCoreTests/    Tests for the engine.
 docs/                    Spec, roadmap and design notes.
