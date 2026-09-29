@@ -10,10 +10,10 @@ checked on a Mac.
 | 1 | `DedupCore` foundations: `Track` model, text folding, the full set of toggleable normalisation rules (brackets, mix-class awareness, feat./collab artist splitting, "The", track-number prefixes, punctuation/diacritics), with tests | ✅ done, tests pass on macOS |
 | 2 | `DedupCore` matching: similarity metrics (Jaro-Winkler, Levenshtein ratio, token-set ratio), per-field levels, duration/track#/album/format constraints, blocking, union-find with anchor check, confidence and reasons, presets, with tests and a 50k synthetic benchmark | ✅ done, tests pass on macOS |
 | 3 | `DedupCore` selection: auto-select keeper rules and a removal plan (Bin or mirrored-folder destinations), with tests | ✅ done, tests pass on macOS |
-| 4 | App shell: `project.yml` (XcodeGen), TagLib integration, concurrent folder scanner, decoded duration via AVFoundation, scan cache | ✅ scanner and TagLib tested on macOS. ⚠️ The app shell compiles and links (`scripts/check-app.sh`) but hasn't been built in Xcode or run |
-| 5 | Results UI: flat banded table, collapsible groups, dynamic tag columns, diff highlighting, match settings panel | ❌ Mac |
+| 4 | App shell: `project.yml` (XcodeGen), TagLib integration, concurrent folder scanner, decoded duration via AVFoundation, scan cache | ✅ done, built and run in Xcode |
+| 5 | Results UI: flat banded table, collapsible groups, dynamic tag columns, diff highlighting, match settings panel | ✅ done. The results logic is tested anywhere; the table and models by app tests in Xcode |
 | 6 | Player: AVPlayer transport, A/B at the same position, waveform | ❌ Mac |
-| 7 | Removal: confirm sheet, Bin or mirrored move, JSON log, undo | ❌ Mac (the plan logic is tested in phase 3) |
+| 7 | Removal: confirm sheet, Bin or mirrored move, JSON log, undo; auto-select keepers with editable rules and a preview (SPEC §6) | ❌ Mac (the plan and keeper logic are tested in phase 3) |
 | 8 | Basic tag editing: copy tags to the keeper via TagLib | ❌ Mac |
 | 9 | Polish: settings persistence, presets UI, keyboard shortcuts, app icon | ❌ Mac |
 
@@ -29,6 +29,8 @@ checked on a Mac.
 - **Blocking:** candidates are bucketed by the normalised artist (per primary
   artist token) and by the normalised title prefix. Only pairs within a bucket
   are compared.
-- **Table:** try SwiftUI `Table` with `TableColumnCustomization` first. Fall
-  back to an `NSTableView` wrapped in `NSViewRepresentable` if 50k rows with
-  dynamic columns turns out to be too slow.
+- **Table:** an `NSTableView` in `NSViewRepresentable`. SwiftUI `Table` can't
+  draw full-width group header rows or colour rows by group. The table is flat
+  (a header row per group, then its copies) and handles collapsing itself,
+  because an `NSOutlineView` took over a second to expand 20,000 groups. With
+  50,000 tracks, loading takes under 0.1 s and filtering about 0.1 s.

@@ -62,6 +62,8 @@ xcodegen           # generates Deduplicator.xcodeproj, which isn't committed
 open Deduplicator.xcodeproj
 ```
 
+In Xcode, ⌘U runs every test: the app's own and the package's.
+
 ## Project layout
 
 ```
@@ -73,6 +75,7 @@ Sources/DedupScanner/    Folder scanning: finds audio files, reads tags with
                          TagLib, measures decoded duration, keeps the scan cache.
 Sources/CTagLib/         TagLib, vendored as source, with a small C interface.
 App/                     macOS SwiftUI app: UI, player and file operations.
+AppTests/                Tests hosted in the app, for its models and table.
 Tests/                   Tests for DedupCore and DedupScanner.
 scripts/                 Test and build helpers.
 docs/                    Spec, roadmap and design notes.

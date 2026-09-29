@@ -146,18 +146,35 @@ every member matches the group's anchor (configurable).
 
 - **One flat, banded table** (like Swinsian): every file in every duplicate
   group, with groups separated by a group header row and alternating band
-  colours. Groups can be collapsed. The group header shows the file count, the
-  confidence and why the tracks matched.
+  colours. Groups can be collapsed by clicking the header or its disclosure
+  button; Option-click collapses or expands every group. The group header shows
+  the file count, the confidence and why the tracks matched, and warns when
+  every copy is marked for removal.
 - Columns:
   - default columns: ✓ (remove), ▶, track #, title, artist, album artist,
-    album, year, comment, duration, bitrate, format, size, path
+    album, year, comment, duration, bitrate, format, size, path. More built-in
+    columns: genre, disc, sample rate, bit depth, channels, modified, file name.
   - columns can be resized, reordered and hidden, and the layout persists
-  - **any tag** found in the scanned files can be added as a column (a column
-    picker lists every tag key seen)
-  - cells whose value differs from the rest of the group are highlighted
-- Filtering by text and by confidence. Sorting groups.
+  - **any tag** found in the scanned files can be added as a column. The column
+    picker (right-click the column headings, or the Columns toolbar menu) lists
+    every tag key seen.
+  - cells whose value differs from the rest of the group are highlighted: a
+    cell is highlighted when its value isn't the group's single most common
+    value. When no value is most common, as with two copies that disagree,
+    every copy's cell is highlighted. Path and file name never are.
+- Filtering by text (title, artist, album, album artist and path, ignoring case
+  and accents) and by minimum confidence. A group shows when any copy matches.
+- Sorting groups by confidence (the default), by number of copies, or by
+  clicking a column heading, which also orders the copies within each group.
 - Keyboard: ↑/↓ moves between rows, space plays or pauses, `k` keeps, `d` marks
-  for deletion, and ⌘↓ goes to the next group.
+  for deletion, and ⌘↓ and ⌘↑ go to the next and previous group. The
+  right-click menu has Mark for Removal, Keep and Show in Finder.
+- The match settings sit in an inspector beside the table, starting from the
+  Standard, DJ Library or Loose preset. Changes apply as you make them, after a
+  short pause.
+- A new scan clears the marks. Changing match settings drops marks on copies
+  that are no longer in any group, so a copy can't stay marked where it can't
+  be seen. Marks in groups hidden by the filter stay.
 
 ## 5. Player
 

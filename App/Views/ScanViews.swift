@@ -2,33 +2,26 @@ import DedupCore
 import DedupScanner
 import SwiftUI
 
-/// Shows scan progress, then a summary of what was found. The results table
-/// replaces the summary in phase 5.
-struct ScanStatusView: View {
+/// Shown before the first scan.
+struct NoScanView: View {
     @Environment(LibraryModel.self) private var library
 
     var body: some View {
-        switch library.state {
-        case .idle:
-            ContentUnavailableView {
-                Label("No Scan Yet", systemImage: "music.note.list")
-            } description: {
-                Text(library.folders.isEmpty ? "Add a folder of music to get started." : "Scan your folders to find duplicates.")
-            } actions: {
+        ContentUnavailableView {
+            Label("No Scan Yet", systemImage: "music.note.list")
+        } description: {
+            Text(library.folders.isEmpty ? "Add a folder of music to get started." : "Scan your folders to find duplicates.")
+        } actions: {
+            if library.folders.isEmpty {
+                Button("Add Folder…") { library.isChoosingFolders = true }
+            } else {
                 Button("Scan") { library.scan() }
-                    .disabled(!library.canScan)
             }
-        case .scanning(let progress):
-            ScanProgressView(progress: progress) { library.cancelScan() }
-        case .finished(let summary):
-            ScanSummaryView(summary: summary, issues: library.issues)
-        case .failed(let message):
-            ContentUnavailableView("Scan Failed", systemImage: "exclamationmark.triangle", description: Text(message))
         }
     }
 }
 
-private struct ScanProgressView: View {
+struct ScanProgressView: View {
     let progress: ScanProgress
     let cancel: () -> Void
 
@@ -54,7 +47,8 @@ private struct ScanProgressView: View {
     }
 }
 
-private struct ScanSummaryView: View {
+/// What the last scan found, and any files it had problems with.
+struct ScanSummaryView: View {
     let summary: ScanSummary
     let issues: [ScanIssue]
 

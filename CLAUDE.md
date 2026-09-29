@@ -28,6 +28,8 @@ The code is split into three layers. Keep the boundaries strict.
      ratios)
    - `MatchCriteria` and the grouping engine (blocking plus union-find)
    - auto-select ("keeper") rules, and the removal plan and executor
+   - the results logic behind the table (`Results/`): column values, which
+     cells differ within a group, filtering and ordering groups
 
    It must compile and pass its tests on Linux (`swift test`), so Claude can
    verify it in the cloud container, which has no Xcode.
@@ -40,8 +42,10 @@ The code is split into three layers. Keep the boundaries strict.
    behind `#if canImport(AVFoundation)`, so the rest should also build on Linux.
 3. **`App/`** (the macOS app, built from `project.yml` with XcodeGen) holds the
    SwiftUI/AppKit UI and the player, and ties the other two together. It
-   depends on the `DedupCore` and `DedupScanner` products. Tag writing
-   (phase 8) goes through `TagLibFile.write`.
+   depends on the `DedupCore` and `DedupScanner` products. The results table is
+   an `NSTableView` (see `App/Results/Table/`). Tag writing (phase 8) goes
+   through `TagLibFile.write`. `AppTests/` holds tests hosted in the app, for
+   the models and the table.
 
 ## Conventions
 
@@ -67,7 +71,19 @@ swift build                 # build everything the host platform supports
 scripts/test.sh             # run the package tests (wraps `swift test`, see below)
 scripts/check-app.sh        # compile and link the app sources without Xcode
 xcodegen && open Deduplicator.xcodeproj   # macOS app
+xcodebuild -project Deduplicator.xcodeproj -scheme Deduplicator test   # every test (⌘U in Xcode)
 ```
+
+To look at the results screen without clicking through the app, render it to
+PNG files (light and dark mode) and open them:
+
+```sh
+TEST_RUNNER_SNAPSHOT_DIR=/tmp/shots xcodebuild -project Deduplicator.xcodeproj \
+    -scheme Deduplicator test -only-testing:DeduplicatorTests/SnapshotTests
+```
+
+The capture can't draw SwiftUI's glass and material views, such as toolbar
+buttons and the inspector's background, so those come out blank or garbled.
 
 ## Environment notes for Claude
 
@@ -85,6 +101,11 @@ xcodegen && open Deduplicator.xcodeproj   # macOS app
   plain `swift test`, so use it everywhere. Don't try to fix this in
   `Package.swift`: the generated test runner doesn't get the target's flags, so
   it builds but silently runs no tests.
+- To run one Swift Testing test with `-only-testing`, include the parentheses:
+  `DeduplicatorTests/ResultsTableTests/largeResultsStayQuick()`. Without them
+  nothing runs, and the run still succeeds.
+- Tests that make an `NSWindow` must set `isReleasedWhenClosed = false`, or
+  closing it over-releases the window and crashes the test host later.
 - Without Xcode there's no `xcodebuild`, so the app bundle can't be built.
   `scripts/check-app.sh` still compiles and links the app's Swift sources
   against the package as a bare executable. When that's the only check app code

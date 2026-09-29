@@ -16,18 +16,23 @@ final class LibraryModel {
 
     private(set) var folders: [URL]
     private(set) var state: ScanState = .idle
-    private(set) var tracks: [Track] = []
     private(set) var issues: [ScanIssue] = []
+    /// Duplicates among the tracks from the last scan.
+    let results: ResultsModel
     /// Set to show the folder picker, for example from the Add Folder command.
     var isChoosingFolders = false
 
     @ObservationIgnored private var scanTask: Task<Void, Never>?
     @ObservationIgnored private var scanID = UUID()
     @ObservationIgnored private let defaults: UserDefaults
+    @ObservationIgnored private let cacheURL: URL?
     private static let foldersKey = "scanFolders"
 
-    init(defaults: UserDefaults = .standard) {
+    /// `cacheURL` is where scans keep their cache; nil turns the cache off.
+    init(defaults: UserDefaults = .standard, cacheURL: URL? = AppFolders.scanCache) {
         self.defaults = defaults
+        self.cacheURL = cacheURL
+        results = ResultsModel(defaults: defaults)
         folders = (defaults.stringArray(forKey: Self.foldersKey) ?? [])
             .map { URL(filePath: $0, directoryHint: .isDirectory) }
     }
@@ -38,12 +43,21 @@ final class LibraryModel {
 
     var canScan: Bool { !isScanning && !folders.isEmpty }
 
+    /// Adds folders that aren't in the list yet, including repeats within `urls`.
     func addFolders(_ urls: [URL]) {
-        let known = Set(folders.map(\.standardizedFileURL))
-        let new = urls.map(\.standardizedFileURL).filter { !known.contains($0) }
+        var known = Set(folders.map(Self.folderKey))
+        let new = urls
+            .map { URL(filePath: $0.path(percentEncoded: false), directoryHint: .isDirectory).standardizedFileURL }
+            .filter { known.insert(Self.folderKey($0)).inserted }
         guard !new.isEmpty else { return }
         folders += new
         saveFolders()
+    }
+
+    /// Compares folders by path, whether or not the URL ends in a slash.
+    private static func folderKey(_ url: URL) -> String {
+        let path = url.standardizedFileURL.path(percentEncoded: false)
+        return path.count > 1 && path.hasSuffix("/") ? String(path.dropLast()) : path
     }
 
     func removeFolders(_ urls: Set<URL>) {
@@ -57,7 +71,7 @@ final class LibraryModel {
         scanID = id
         let previous = state
         state = .scanning(ScanProgress(phase: .finding, found: 0, completed: 0))
-        let scanner = LibraryScanner(cacheURL: AppFolders.scanCache)
+        let scanner = LibraryScanner(cacheURL: cacheURL)
         let folders = folders
         scanTask = Task {
             let started = ContinuousClock.now
@@ -86,7 +100,7 @@ final class LibraryModel {
     }
 
     private func finish(_ result: ScanResult, elapsed: Duration) {
-        tracks = result.tracks
+        results.load(result.tracks)
         issues = result.issues
         state = .finished(ScanSummary(result: result, elapsed: elapsed))
     }

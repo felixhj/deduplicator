@@ -1,38 +1,28 @@
 # Handoff
 
-Read this, then `CLAUDE.md`, `docs/SPEC.md` and `docs/ROADMAP.md`. Phase 4
-is on branch `claude/phase-4-app-shell`, which was committed locally but not
-pushed (2026-09-29).
+Read this, then `CLAUDE.md`, `docs/SPEC.md` and `docs/ROADMAP.md`. Phase 5
+is on branch `claude/phase-5-results-ui`, committed locally but not pushed
+(2026-09-29). Phases 0–4 are on `main`.
 
 ## Where we are
 
-- Phases 0–3 (the `DedupCore` engine) compile, and all their tests pass on
-  macOS with Swift 6.3.3. They needed no code changes.
-- Phase 4 is written:
-  - `CTagLib` (TagLib 2.3.2, vendored, with a C interface) and `DedupScanner`
-    (folder scanning, tag and duration reading, the scan cache) are package
-    targets. Their tests pass on macOS, including end-to-end scans of real
-    AAC, ALAC, FLAC, AIFF, WAV and MP3 files.
-  - `project.yml` and a SwiftUI shell in `App/`: a folder list, Scan with
-    progress and Stop, and a summary with any problems.
-- The Mac used so far only has the Command Line Tools, so **the app hasn't been
-  built in Xcode or run**. `scripts/check-app.sh` compiles and links its
-  sources, and `xcodegen` generates a project that `plutil` accepts.
+- Phases 0–5 are done. The app builds in Xcode 27 (Swift 6.4) with no
+  warnings, launches, and every test passes: the package tests (`swift test`
+  or `scripts/test.sh`) and the app tests in `AppTests/` (⌘U in Xcode).
+- Phase 5 added the results screen: the banded table with group headers,
+  collapsing, tick boxes, highlighted differences, any tag as a column, header
+  sorting, a text and confidence filter, the `k`, `d` and ⌘↓ keys, and the
+  match settings inspector.
+- Nobody has scanned a real music library with the app yet. Scans of
+  generated audio files work, in the package tests and in an app test.
 - Nothing has been built on Linux since TagLib was added.
 
-## Do this first, on a Mac with Xcode
+## Do this first
 
-1. `scripts/test.sh`. All tests should pass.
-2. `xcodegen && open Deduplicator.xcodeproj`, then build and run. Check:
-   - Xcode resolves the Swift package, which sits in the project's own folder
-     (`path: .`). XcodeGen always adds a local package twice: as a package
-     reference and as a folder under "Packages". If Xcode objects, generate
-     the project into a subfolder so it isn't next to `Package.swift`.
-   - The C++ `CTagLib` target builds and links in Xcode.
-   - Scanning a real music folder gives the right tags, formats and durations
-     for a few files you know. A second scan should say most tracks came from
-     the scan cache.
-3. Then start phase 5.
+1. Run the app on a real music folder. Check that groups make sense, that
+   columns can be added, moved and resized and are remembered, and that the
+   match settings change the groups.
+2. Then start phase 6 (the player).
 
 ## Decisions already made with the user (don't re-ask)
 
@@ -72,6 +62,9 @@ pushed (2026-09-29).
   parallel and groups with union-find plus an anchor check.
 - `Selection/`: `KeeperSelector`, `RemovalPlanner`, `RemovalExecutor` (through
   `FileMover`) and `RemovalLog`.
+- `Results/`: `TrackColumn` (each column's title, cell text and sort key),
+  `GroupDifferences` (which copies differ), `ResultFilter`, `SearchIndex`,
+  `GroupOrder` and `GroupArrangement`.
 
 ## Scanner map (`Sources/DedupScanner`, `Sources/CTagLib`)
 
@@ -107,12 +100,26 @@ pushed (2026-09-29).
 
 - `DeduplicatorApp`: one `Window`, with Add Folder… (⌘O), Scan (⌘R) and Stop
   Scan (⌘.) commands.
-- `LibraryModel` (`@MainActor`, `@Observable`): the folders (kept in
-  `UserDefaults`), scan state, tracks and issues.
+- `Library/LibraryModel` (`@MainActor`, `@Observable`): the folders (kept in
+  `UserDefaults`), scan state and issues. It owns the `ResultsModel` and hands
+  it each scan's tracks.
+- `Results/ResultsModel`: runs `MatchEngine` off the main actor after a scan and
+  after settings change (with a 300 ms pause, cancelling any older run), and
+  holds the filter, order, columns, widths, marks and selection. Match
+  settings and the column layout are saved in `UserDefaults`.
+- `Results/Table/`: `ResultsTableController` drives a flat `ResultsTableView`
+  (an `NSTableView`): a full-width `GroupHeaderView` row per group, then a row
+  per copy, painted by `BandRowView`. It rebuilds rows when the model's
+  `revision` changes and only refreshes tick boxes when `marksRevision` does.
+  `ResultsTable` puts it in SwiftUI.
+- `Results/ResultsView`: the table, the toolbar (confidence, order, columns,
+  settings), the search field, the status bar and the scan report popover.
+  `Results/MatchSettingsView` is the inspector.
+- `Views/`: `ContentView` (split view, Scan button, folder picker),
+  `FolderList` (add, remove, drop) and `ScanViews` (before the first scan,
+  progress, and the scan report).
 - `AppFolders`: `~/Library/Application Support/Deduplicator`, which the removal
   log will share.
-- Views: `ContentView` (split view, toolbar, folder picker), `FolderList` (add,
-  remove, drop) and `ScanStatusView` (progress, then a summary).
 
 ## Things learned the hard way
 
@@ -127,10 +134,19 @@ pushed (2026-09-29).
   fixtures encode from 16-bit integers. There's no MP3 encoder, so MP3
   fixtures are hand-made silent frames.
 
-## Next: phase 5 (results UI)
+- An `NSOutlineView` took over a second to expand 20,000 groups, so the
+  results table is a flat `NSTableView` that adds and removes a group's rows
+  itself.
+- Accent-insensitive `range(of:)` on every keystroke took 0.5 s over 50,000
+  tracks. `SearchIndex` folds each track's text once instead.
+- Xcode 27's SwiftPM builds with Swift Build, whose output layout differs from
+  the older native build system's. `scripts/check-app.sh` handles both.
+- Tests that make an `NSWindow` must set `isReleasedWhenClosed = false`.
 
-See `docs/ROADMAP.md` and SPEC §4. After a scan, run `MatchEngine` off the main
-actor with settings from a match settings panel. Then show the groups in one
-flat banded table with collapsible groups, with columns for any key in
-`Track.tags` and differing values highlighted. Try SwiftUI `Table` first, and
-fall back to `NSTableView` if 50k rows are too slow.
+## Next: phase 6 (player)
+
+See `docs/ROADMAP.md` and SPEC §5: play, pause and seek with `AVPlayer`, a
+waveform generated in the background and cached, and switching between copies
+in a group at the same position. Space plays or pauses in the table, and the
+▶ column from SPEC §4 comes with it. `ResultsModel.selection` already follows
+the table's selection. Then phase 7 (removal and auto-select).
